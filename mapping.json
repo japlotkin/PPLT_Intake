@@ -245,10 +245,10 @@
         {
           "id": "vq3CUHnwEzFnuqrdiw7d",
           "name": "2.Spanish Worker's Compensation",
-          "purpose": "unknown",
-          "practice_area": "other",
+          "purpose": "active_practice",
+          "practice_area": "workers_comp",
           "co_counsel_firm": null,
-          "include_in_metrics": false,
+          "include_in_metrics": true,
           "stages": [
             {
               "id": "fa941617-5b05-4bc3-b49c-824fe6a7d21b",
@@ -1265,10 +1265,10 @@
         {
           "id": "a9wdWs4Uvs6xiTNh4np6",
           "name": "5.Harris Firm tracking (NY)",
-          "purpose": "archived",
+          "purpose": "co_counsel_tracking",
           "practice_area": null,
-          "co_counsel_firm": null,
-          "include_in_metrics": false,
+          "co_counsel_firm": "Harris Firm",
+          "include_in_metrics": true,
           "stages": [
             {
               "id": "34140d08-793c-46f6-aa27-a4299a035a28",
@@ -2955,10 +2955,10 @@
         {
           "id": "02GD9NXDwQQecwQMSnYt",
           "name": "x-Shook & Stone Tracking",
-          "purpose": "archived",
+          "purpose": "co_counsel_tracking",
           "practice_area": null,
-          "co_counsel_firm": null,
-          "include_in_metrics": false,
+          "co_counsel_firm": "Shook & Stone",
+          "include_in_metrics": true,
           "stages": [
             {
               "id": "9cd9652b-983d-4489-9109-c0b7836c8bc6",
@@ -3023,10 +3023,10 @@
         {
           "id": "TJK8jNhuohItGNBu9pwP",
           "name": "z-Chaffin Luhana  - Tracking",
-          "purpose": "archived",
+          "purpose": "co_counsel_tracking",
           "practice_area": null,
-          "co_counsel_firm": null,
-          "include_in_metrics": false,
+          "co_counsel_firm": "Chaffin Luhana",
+          "include_in_metrics": true,
           "stages": [
             {
               "id": "14ed6ce1-e1eb-4aaf-b2e0-f49b8088d0f6",
@@ -5182,13 +5182,6 @@
       ],
       "custom_fields": [
         {
-          "id": "03aGH9rFmCoCtgyZ2YPE",
-          "name": "Accident State",
-          "fieldKey": "contact.accident_state",
-          "dataType": "TEXT",
-          "kind": "state"
-        },
-        {
           "id": "05fuojCI82SBaMU4eWat",
           "name": "Date of Injury (OLD)",
           "fieldKey": "contact.injury_date",
@@ -5229,13 +5222,6 @@
           "fieldKey": "contact.cunto_dinero_te_deben_si_lo_sabes",
           "dataType": "LARGE_TEXT",
           "kind": null
-        },
-        {
-          "id": "2OhxKsWeW0Fz6ggKInhq",
-          "name": "Which State do you live in",
-          "fieldKey": "contact.which_state_do_you_live_in",
-          "dataType": "SINGLE_OPTIONS",
-          "kind": "state"
         },
         {
           "id": "2XQm7dHyU6JXvm4kS3TO",
@@ -5490,13 +5476,6 @@
           "kind": null
         },
         {
-          "id": "7W38gJ0G109uW2LSVzV7",
-          "name": "In what state did the accident happen?",
-          "fieldKey": "contact.in_what_state_did_the_accident_happen",
-          "dataType": "TEXT",
-          "kind": "state"
-        },
-        {
           "id": "7bvPvWxHcbSldK3RnNi5",
           "name": "Warmup Reply Counter",
           "fieldKey": "contact.warmup_reply_counter",
@@ -5607,13 +5586,6 @@
           "fieldKey": "contact.opt_in_text",
           "dataType": "TEXT",
           "kind": null
-        },
-        {
-          "id": "DlowAZaXaC3ELCm6H91D",
-          "name": "State (Jurisdiction)",
-          "fieldKey": "contact.state_jurisdiction",
-          "dataType": "TEXT",
-          "kind": "state"
         },
         {
           "id": "E30E4XXTkfggnSGaHk5g",
@@ -6369,7 +6341,7 @@
           "name": "Premises Case Type",
           "fieldKey": "contact.premises_case_type",
           "dataType": "TEXT",
-          "kind": "practice_area"
+          "kind": null
         },
         {
           "id": "flI9jUvZ0As0XqjqVOgV",
@@ -6764,13 +6736,6 @@
           "kind": null
         },
         {
-          "id": "vaMSMkpKqSsiVMbcvA4W",
-          "name": "State list",
-          "fieldKey": "contact.state_list",
-          "dataType": "SINGLE_OPTIONS",
-          "kind": "state"
-        },
-        {
           "id": "vx5GKa3P5gSpNi4hEKBp",
           "name": "\u00bfQu\u00e9 parte te lesionaste? (partes del cuerpo)",
           "fieldKey": "contact.qu_parte_te_lesionaste_partes_del_cuerpo",
@@ -6867,6 +6832,41 @@
           "fieldKey": "contact.what_do_you_do_for_a_living_work_job_occupation",
           "dataType": "LARGE_TEXT",
           "kind": null
+        },
+        {
+          "id": "DlowAZaXaC3ELCm6H91D",
+          "name": "State (Jurisdiction)",
+          "fieldKey": "contact.state_jurisdiction",
+          "dataType": "TEXT",
+          "kind": "state"
+        },
+        {
+          "id": "03aGH9rFmCoCtgyZ2YPE",
+          "name": "Accident State",
+          "fieldKey": "contact.accident_state",
+          "dataType": "TEXT",
+          "kind": "state"
+        },
+        {
+          "id": "2OhxKsWeW0Fz6ggKInhq",
+          "name": "Which State do you live in",
+          "fieldKey": "contact.which_state_do_you_live_in",
+          "dataType": "SINGLE_OPTIONS",
+          "kind": "state"
+        },
+        {
+          "id": "7W38gJ0G109uW2LSVzV7",
+          "name": "In what state did the accident happen?",
+          "fieldKey": "contact.in_what_state_did_the_accident_happen",
+          "dataType": "TEXT",
+          "kind": "state"
+        },
+        {
+          "id": "vaMSMkpKqSsiVMbcvA4W",
+          "name": "State list",
+          "fieldKey": "contact.state_list",
+          "dataType": "SINGLE_OPTIONS",
+          "kind": "state"
         }
       ],
       "users_all": [
@@ -6952,11 +6952,6 @@
         }
       ],
       "intake_users": [
-        {
-          "id": "D3rtbLsiod24q4j2jyYf",
-          "name": "Clara Fattal 1",
-          "email": "clientcare8@pinderplotkin.com"
-        },
         {
           "id": "DK2sUnbBOKLviiAw3iIa",
           "name": "Natasha Saunders",
@@ -8295,10 +8290,10 @@
         {
           "id": "Q9y5wJy0E0eNI16foQuJ",
           "name": "5.Harris Firm tracking (NY)",
-          "purpose": "archived",
+          "purpose": "co_counsel_tracking",
           "practice_area": null,
-          "co_counsel_firm": null,
-          "include_in_metrics": false,
+          "co_counsel_firm": "Harris Firm",
+          "include_in_metrics": true,
           "stages": [
             {
               "id": "34140d08-793c-46f6-aa27-a4299a035a28",
@@ -11595,10 +11590,10 @@
         {
           "id": "yEZOJuWlgexIneNU3E1Y",
           "name": "x-Shook & Stone Tracking",
-          "purpose": "archived",
+          "purpose": "co_counsel_tracking",
           "practice_area": null,
-          "co_counsel_firm": null,
-          "include_in_metrics": false,
+          "co_counsel_firm": "Shook & Stone",
+          "include_in_metrics": true,
           "stages": [
             {
               "id": "e91bb088-3b2a-411f-88d3-ed0970e84097",
@@ -16005,13 +16000,6 @@
           "kind": null
         },
         {
-          "id": "7kWMpJIelxHcl8xyRqOa",
-          "name": "State where the incident happened",
-          "fieldKey": "contact.state_where_the_incident_happened",
-          "dataType": "SINGLE_OPTIONS",
-          "kind": "state"
-        },
-        {
           "id": "7sWAvFqpX1dd2zneXOUZ",
           "name": "Did the accident happen in the last 12 months?",
           "fieldKey": "contact.did_the_accident_happen_in_the_last_12_months",
@@ -16222,13 +16210,6 @@
           "kind": null
         },
         {
-          "id": "GnpNn8nLp0yIudIef4ml",
-          "name": "Accident State",
-          "fieldKey": "contact.accident_state",
-          "dataType": "TEXT",
-          "kind": "state"
-        },
-        {
           "id": "GpCuksfqkt7qS0zQZJ2N",
           "name": "Warmup Reply Counter",
           "fieldKey": "contact.warmup_reply_counter",
@@ -16332,13 +16313,6 @@
           "fieldKey": "contact.please_breifly_describe_the_issue_you_are_facing",
           "dataType": "LARGE_TEXT",
           "kind": null
-        },
-        {
-          "id": "Jti2cUoyigbRhwzPuI8V",
-          "name": "State (Jurisdiction)",
-          "fieldKey": "contact.state_jurisdiction",
-          "dataType": "TEXT",
-          "kind": "state"
         },
         {
           "id": "K4l0QOXpzDC1c5uxzFYq",
@@ -16551,20 +16525,6 @@
           "kind": null
         },
         {
-          "id": "RVhs2MhULjkm9AWnVzat",
-          "name": "In what state did the accident happen?",
-          "fieldKey": "contact.in_what_state_did_the_accident_happen",
-          "dataType": "TEXT",
-          "kind": "state"
-        },
-        {
-          "id": "RzEzaFPlcfSft3ZEYi4Z",
-          "name": "What State do you live in ",
-          "fieldKey": "contact.what_state_do_you_live_in",
-          "dataType": "SINGLE_OPTIONS",
-          "kind": "state"
-        },
-        {
           "id": "S2o7C3jSEru0rfik1NTq",
           "name": "Bot Flag",
           "fieldKey": "contact.bot_flag",
@@ -16612,13 +16572,6 @@
           "fieldKey": "contact.t_ime_zone",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
-        },
-        {
-          "id": "T80LEf3kSogpYWoan5ZD",
-          "name": "State list",
-          "fieldKey": "contact.state_list",
-          "dataType": "SINGLE_OPTIONS",
-          "kind": "state"
         },
         {
           "id": "TE4GeLKJmP4Yr1oZ2J8e",
@@ -17081,13 +17034,6 @@
           "fieldKey": "contact.birthday",
           "dataType": "LARGE_TEXT",
           "kind": null
-        },
-        {
-          "id": "gf7Qo93AXFCmNewDoAj9",
-          "name": "State(s)",
-          "fieldKey": "contact.state_s",
-          "dataType": "TEXT",
-          "kind": "state"
         },
         {
           "id": "ghk2ZyafcmU2lHMeQe2c",
@@ -17690,6 +17636,55 @@
           "fieldKey": "contact.ai_closebot_assistant_is",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
+        },
+        {
+          "id": "Jti2cUoyigbRhwzPuI8V",
+          "name": "State (Jurisdiction)",
+          "fieldKey": "contact.state_jurisdiction",
+          "dataType": "TEXT",
+          "kind": "state"
+        },
+        {
+          "id": "7kWMpJIelxHcl8xyRqOa",
+          "name": "State where the incident happened",
+          "fieldKey": "contact.state_where_the_incident_happened",
+          "dataType": "SINGLE_OPTIONS",
+          "kind": "state"
+        },
+        {
+          "id": "GnpNn8nLp0yIudIef4ml",
+          "name": "Accident State",
+          "fieldKey": "contact.accident_state",
+          "dataType": "TEXT",
+          "kind": "state"
+        },
+        {
+          "id": "RVhs2MhULjkm9AWnVzat",
+          "name": "In what state did the accident happen?",
+          "fieldKey": "contact.in_what_state_did_the_accident_happen",
+          "dataType": "TEXT",
+          "kind": "state"
+        },
+        {
+          "id": "RzEzaFPlcfSft3ZEYi4Z",
+          "name": "What State do you live in ",
+          "fieldKey": "contact.what_state_do_you_live_in",
+          "dataType": "SINGLE_OPTIONS",
+          "kind": "state"
+        },
+        {
+          "id": "T80LEf3kSogpYWoan5ZD",
+          "name": "State list",
+          "fieldKey": "contact.state_list",
+          "dataType": "SINGLE_OPTIONS",
+          "kind": "state"
+        },
+        {
+          "id": "gf7Qo93AXFCmNewDoAj9",
+          "name": "State(s)",
+          "fieldKey": "contact.state_s",
+          "dataType": "TEXT",
+          "kind": "state"
         }
       ],
       "users_all": [
@@ -17815,11 +17810,6 @@
         }
       ],
       "intake_users": [
-        {
-          "id": "D3rtbLsiod24q4j2jyYf",
-          "name": "Clara Fattal 1",
-          "email": "clientcare8@pinderplotkin.com"
-        },
         {
           "id": "DK2sUnbBOKLviiAw3iIa",
           "name": "Natasha Saunders",

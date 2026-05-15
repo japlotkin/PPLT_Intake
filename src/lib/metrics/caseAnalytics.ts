@@ -36,7 +36,20 @@ function stateFromOpp(
 
 function stateFieldIdsFor(key: LocationKey): string[] {
   const loc = getLocation(key);
-  return loc.custom_fields.filter((c) => c.kind === "state").map((c) => c.id);
+  // Jason: prefer "State (Jurisdiction)" first, then fall back to others.
+  // Sort by a priority key: jurisdiction-named fields beat everything else,
+  // and original mapping order breaks ties.
+  const stateFields = loc.custom_fields.filter((c) => c.kind === "state");
+  const ranked = stateFields
+    .map((f, i) => ({
+      f,
+      priority: /jurisdiction/i.test(f.name) ? 0 : 1,
+      originalIndex: i,
+    }))
+    .sort(
+      (a, b) => a.priority - b.priority || a.originalIndex - b.originalIndex
+    );
+  return ranked.map((r) => r.f.id);
 }
 
 export async function caseAnalytics(): Promise<CaseAnalytics> {
