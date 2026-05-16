@@ -263,7 +263,9 @@ export interface CostAnalyticsPayload {
 export interface DashboardData {
   generatedAt: string; // ISO
   range: { label: string; start: string; end: string };
-  overview: OverviewData;
+  overview: OverviewData; // combined
+  overviewEnglish?: OverviewData; // PPLT only
+  overviewSpanish?: OverviewData; // Abogado only
   kpi: { months: KpiBlock[]; quarters: KpiBlock[] };
   email: EmailMetrics[];
   leadsEnglish: LeadAnalytics;

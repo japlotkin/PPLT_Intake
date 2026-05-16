@@ -404,7 +404,7 @@ export default function DashboardView({
 
         {data && (
           <>
-            {isVisible(data.visibility, "overview") && <Overview data={data} />}
+            {isVisible(data.visibility, "overview") && <Overview data={data} bucket={bucket} />}
             {isVisible(data.visibility, "kpi") && <Kpi data={data} bucket={bucket} />}
             {isVisible(data.visibility, "cost") && <CostBlock data={data} bucket={bucket} />}
             {isVisible(data.visibility, "leads") && <LeadsBlock data={data} bucket={bucket} />}
@@ -432,11 +432,21 @@ export default function DashboardView({
     </div>
   );
 
-  function Overview({ data }: { data: DashboardData }) {
-    const o = data.overview;
+  function Overview({ data, bucket }: { data: DashboardData; bucket: Bucket }) {
+    const o =
+      bucket === "english"
+        ? data.overviewEnglish ?? data.overview
+        : bucket === "spanish"
+          ? data.overviewSpanish ?? data.overview
+          : data.overview;
+    const bucketLabel =
+      bucket === "english" ? "PPLT (English)" : bucket === "spanish" ? "Abogado (Spanish)" : "Combined";
     return (
       <section id="overview">
-        <SectionHeader title="Overview" subtitle="Last 30 days vs prior 30 days, last 7 days vs prior 7 days" />
+        <SectionHeader
+          title="Overview"
+          subtitle={`${bucketLabel} · Last 30 days vs prior 30 days, last 7 days vs prior 7 days`}
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={Users}

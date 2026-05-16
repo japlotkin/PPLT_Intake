@@ -20,66 +20,67 @@ import {
 import { delta } from "./helpers";
 import type { OverviewData } from "../types";
 
-/** Count leads (contacts created) across both buckets within a range. */
-export async function leadsInRange(start: Date, end: Date): Promise<number> {
+export type OverviewBucket = "combined" | "english" | "spanish";
+
+/** Whether each location contributes to the bucket. */
+function bucketIncludes(bucket: OverviewBucket): { abogado: boolean; pplt: boolean } {
+  return {
+    abogado: bucket !== "english",
+    pplt: bucket !== "spanish",
+  };
+}
+
+/** Count leads (contacts created) within a range, scoped to a bucket. */
+export async function leadsInRange(
+  start: Date,
+  end: Date,
+  bucket: OverviewBucket = "combined"
+): Promise<number> {
+  const inc = bucketIncludes(bucket);
   const [a, p] = await Promise.all([
-    contactsInRange(authAbogado(), start, end),
-    contactsInRange(authPplt(), start, end),
+    inc.abogado ? contactsInRange(authAbogado(), start, end) : Promise.resolve([]),
+    inc.pplt ? contactsInRange(authPplt(), start, end) : Promise.resolve([]),
   ]);
   return a.length + p.length;
 }
 
-/** Count signed opportunities (stage entered in window). */
+/** Count signed opportunities (stage entered in window), scoped to a bucket. */
 export async function signedInRange(
   oppsAbogado: ReturnType<typeof classifyOpportunities>,
   oppsPplt: ReturnType<typeof classifyOpportunities>,
   start: Date,
-  end: Date
+  end: Date,
+  bucket: OverviewBucket = "combined"
 ): Promise<number> {
-  const m1 = countByStageEntry(
-    oppsAbogado,
-    start,
-    end,
-    (o) => o.stageClass === "signed",
-    () => 1
-  );
-  const m2 = countByStageEntry(
-    oppsPplt,
-    start,
-    end,
-    (o) => o.stageClass === "signed",
-    () => 1
-  );
+  const inc = bucketIncludes(bucket);
+  const m1 = inc.abogado
+    ? countByStageEntry(oppsAbogado, start, end, (o) => o.stageClass === "signed", () => 1)
+    : new Map<number, number>();
+  const m2 = inc.pplt
+    ? countByStageEntry(oppsPplt, start, end, (o) => o.stageClass === "signed", () => 1)
+    : new Map<number, number>();
   return (m1.get(1) ?? 0) + (m2.get(1) ?? 0);
 }
 
-/** Count referred-out opportunities (stage entered in window) across both books. */
+/** Count referred-out opportunities (stage entered in window), scoped to a bucket. */
 export async function referredOutInRange(
   oppsAbogado: ReturnType<typeof classifyOpportunities>,
   oppsPplt: ReturnType<typeof classifyOpportunities>,
   start: Date,
-  end: Date
+  end: Date,
+  bucket: OverviewBucket = "combined"
 ): Promise<number> {
-  const m1 = countByStageEntry(
-    oppsAbogado,
-    start,
-    end,
-    (o) =>
-      o.stageClass === "referred_out" ||
-      o.pipelinePurpose === "co_counsel_tracking" ||
-      o.pipelinePurpose === "referral_broker",
-    () => 1
-  );
-  const m2 = countByStageEntry(
-    oppsPplt,
-    start,
-    end,
-    (o) =>
-      o.stageClass === "referred_out" ||
-      o.pipelinePurpose === "co_counsel_tracking" ||
-      o.pipelinePurpose === "referral_broker",
-    () => 1
-  );
+  const inc = bucketIncludes(bucket);
+  const pred = (o: { stageClass: string; pipelinePurpose: string }) =>
+    o.stageClass === "referred_out" ||
+    o.pipelinePurpose === "co_counsel_tracking" ||
+    o.pipelinePurpose === "referral_broker";
+  const m1 = inc.abogado
+    ? countByStageEntry(oppsAbogado, start, end, pred, () => 1)
+    : new Map<number, number>();
+  const m2 = inc.pplt
+    ? countByStageEntry(oppsPplt, start, end, pred, () => 1)
+    : new Map<number, number>();
   return (m1.get(1) ?? 0) + (m2.get(1) ?? 0);
 }
 
@@ -101,13 +102,17 @@ export async function prefetchAllOpps(): Promise<PrefetchedOpps> {
   };
 }
 
-export async function overview(now = new Date()): Promise<OverviewData> {
+export async function overview(
+  bucket: OverviewBucket = "combined",
+  now = new Date()
+): Promise<OverviewData> {
   const last30: Range = rangeFor("last_30_days", now);
   const prev30: Range = previousPeriod(last30);
   const last7: Range = rangeFor("last_7_days", now);
   const prev7: Range = previousPeriod(last7);
 
   const opps = await prefetchAllOpps();
+  const inc = { abogado: bucket !== "english", pplt: bucket !== "spanish" };
 
   const [
     leads30Cur,
@@ -123,18 +128,18 @@ export async function overview(now = new Date()): Promise<OverviewData> {
     sig7Cur,
     sig7Prev,
   ] = await Promise.all([
-    leadsInRange(last30.start, last30.end),
-    leadsInRange(prev30.start, prev30.end),
-    leadsInRange(last7.start, last7.end),
-    leadsInRange(prev7.start, prev7.end),
-    referredOutInRange(opps.abogado, opps.pplt, last30.start, last30.end),
-    referredOutInRange(opps.abogado, opps.pplt, prev30.start, prev30.end),
-    referredOutInRange(opps.abogado, opps.pplt, last7.start, last7.end),
-    referredOutInRange(opps.abogado, opps.pplt, prev7.start, prev7.end),
-    signedInRange(opps.abogado, opps.pplt, last30.start, last30.end),
-    signedInRange(opps.abogado, opps.pplt, prev30.start, prev30.end),
-    signedInRange(opps.abogado, opps.pplt, last7.start, last7.end),
-    signedInRange(opps.abogado, opps.pplt, prev7.start, prev7.end),
+    leadsInRange(last30.start, last30.end, bucket),
+    leadsInRange(prev30.start, prev30.end, bucket),
+    leadsInRange(last7.start, last7.end, bucket),
+    leadsInRange(prev7.start, prev7.end, bucket),
+    referredOutInRange(opps.abogado, opps.pplt, last30.start, last30.end, bucket),
+    referredOutInRange(opps.abogado, opps.pplt, prev30.start, prev30.end, bucket),
+    referredOutInRange(opps.abogado, opps.pplt, last7.start, last7.end, bucket),
+    referredOutInRange(opps.abogado, opps.pplt, prev7.start, prev7.end, bucket),
+    signedInRange(opps.abogado, opps.pplt, last30.start, last30.end, bucket),
+    signedInRange(opps.abogado, opps.pplt, prev30.start, prev30.end, bucket),
+    signedInRange(opps.abogado, opps.pplt, last7.start, last7.end, bucket),
+    signedInRange(opps.abogado, opps.pplt, prev7.start, prev7.end, bucket),
   ]);
 
   // Reviews fetched separately with a hard 15s budget so a slow GHL
@@ -148,17 +153,20 @@ export async function overview(now = new Date()): Promise<OverviewData> {
   // Active cases = open opportunities in in-house active_practice pipelines
   // ONLY. Excludes co-counsel / referral-broker pipelines (where we've
   // referred the case OUT) and excludes lead/signed/withdrawn/closed-lost
-  // stages. This matches what people mean when they say 'cases we're
-  // working on right now'.
+  // stages. Bucket filter drops the location that's not in scope.
   const inHouseAbogadoPipelineIds = new Set(
     activePracticePipelines(getLocation("abogado")).map((p) => p.id)
   );
   const inHousePpltPipelineIds = new Set(
     activePracticePipelines(getLocation("pplt_leads")).map((p) => p.id)
   );
-  const activeTotal =
-    activeNow(opps.abogado).filter((o) => inHouseAbogadoPipelineIds.has(o.raw.pipelineId ?? "")).length +
-    activeNow(opps.pplt).filter((o) => inHousePpltPipelineIds.has(o.raw.pipelineId ?? "")).length;
+  const activeAbogado = inc.abogado
+    ? activeNow(opps.abogado).filter((o) => inHouseAbogadoPipelineIds.has(o.raw.pipelineId ?? "")).length
+    : 0;
+  const activePplt = inc.pplt
+    ? activeNow(opps.pplt).filter((o) => inHousePpltPipelineIds.has(o.raw.pipelineId ?? "")).length
+    : 0;
+  const activeTotal = activeAbogado + activePplt;
 
   return {
     leads30: delta(leads30Cur, leads30Prev),

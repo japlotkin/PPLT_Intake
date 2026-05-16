@@ -116,6 +116,8 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
 
   const [
     overviewData,
+    overviewEnglishData,
+    overviewSpanishData,
     kpi,
     leadsSpanish,
     leadsEnglish,
@@ -127,7 +129,9 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     casesSpanish,
     cost,
   ] = await Promise.all([
-    settled<OverviewData>("Overview", () => overview(), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<OverviewData>("Overview (combined)", () => overview("combined"), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<OverviewData>("Overview (English)", () => overview("english"), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<OverviewData>("Overview (Spanish)", () => overview("spanish"), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
     settled<{ months: KpiBlock[]; quarters: KpiBlock[] }>(
       "KPI table",
       () => kpiTable(),
@@ -203,6 +207,8 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     generatedAt: new Date().toISOString(),
     range: { label: range.label, start: range.start.toISOString(), end: range.end.toISOString() },
     overview: overviewData,
+    overviewEnglish: overviewEnglishData,
+    overviewSpanish: overviewSpanishData,
     kpi,
     email: [], // deprecated; UI no longer renders this section
     leadsEnglish,

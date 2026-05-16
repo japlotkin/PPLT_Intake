@@ -38,6 +38,48 @@ const fixture: DashboardData = {
       ],
     },
   },
+  overviewEnglish: {
+    leads30: { current: 268, previous: 232, pctChange: 15.5, direction: "up" },
+    leads7: { current: 61, previous: 66, pctChange: -7.6, direction: "down" },
+    referrals30: { current: 54, previous: 44, pctChange: 22.7, direction: "up" },
+    referrals7: { current: 12, previous: 15, pctChange: -20.0, direction: "down" },
+    signed30: { current: 28, previous: 26, pctChange: 7.7, direction: "up" },
+    signed7: { current: 5, previous: 7, pctChange: -28.6, direction: "down" },
+    activeTotal: 902,
+    reviews: {
+      week: 6,
+      month: 28,
+      year: 312,
+      lifetime: 2841,
+      perProfile: [
+        { name: "Pinder Plotkin Baltimore", lifetime: 1402 },
+        { name: "Pinder Plotkin Laurel", lifetime: 743 },
+        { name: "Pinder Plotkin Bel Air", lifetime: 391 },
+        { name: "Abogado Attorney", lifetime: 305 },
+      ],
+    },
+  },
+  overviewSpanish: {
+    leads30: { current: 144, previous: 126, pctChange: 14.3, direction: "up" },
+    leads7: { current: 33, previous: 36, pctChange: -8.3, direction: "down" },
+    referrals30: { current: 33, previous: 27, pctChange: 22.2, direction: "up" },
+    referrals7: { current: 7, previous: 9, pctChange: -22.2, direction: "down" },
+    signed30: { current: 13, previous: 12, pctChange: 8.3, direction: "up" },
+    signed7: { current: 3, previous: 4, pctChange: -25.0, direction: "down" },
+    activeTotal: 345,
+    reviews: {
+      week: 6,
+      month: 28,
+      year: 312,
+      lifetime: 2841,
+      perProfile: [
+        { name: "Pinder Plotkin Baltimore", lifetime: 1402 },
+        { name: "Pinder Plotkin Laurel", lifetime: 743 },
+        { name: "Pinder Plotkin Bel Air", lifetime: 391 },
+        { name: "Abogado Attorney", lifetime: 305 },
+      ],
+    },
+  },
   kpi: {
     months: [
       kpiBlock("May 2026", { leads: 412, ref: 87, sig: 41 }, { leads: 268, ref: 54, sig: 28 }),
