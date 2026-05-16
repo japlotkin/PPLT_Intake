@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ preset });
@@ -47,6 +48,9 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setElapsed(0);
+    const t0 = Date.now();
+    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
     try {
       const res = await fetch(`/api/data?${queryString}`);
       if (!res.ok) {
@@ -58,6 +62,7 @@ export default function DashboardPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      clearInterval(tick);
       setLoading(false);
     }
   }, [queryString]);
@@ -114,7 +119,16 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-12">
         {loading && !data && (
-          <div className="text-sm text-neutral-500">Loading dashboard data…</div>
+          <div className="bg-white border border-neutral-200 rounded-xl px-5 py-8 text-center space-y-2">
+            <div className="text-sm font-medium text-neutral-700">
+              Loading dashboard data…
+            </div>
+            <div className="text-xs text-neutral-500">
+              {elapsed}s elapsed · first cold load typically takes 60–120s
+              while we walk 109 GHL pipelines + 3 Meta accounts. Subsequent
+              loads use the hourly cache.
+            </div>
+          </div>
         )}
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3 text-sm">

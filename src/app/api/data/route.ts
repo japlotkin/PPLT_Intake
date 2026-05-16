@@ -55,10 +55,14 @@ function emptyCases(): CaseAnalytics {
 }
 
 async function settled<T>(label: string, fn: () => Promise<T>, fallback: T, warnings: string[]): Promise<T> {
+  const t0 = Date.now();
   try {
-    return await fn();
+    const r = await fn();
+    console.log(`[/api/data] ${label} ok in ${Date.now() - t0}ms`);
+    return r;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[/api/data] ${label} failed after ${Date.now() - t0}ms:`, msg.slice(0, 300));
     warnings.push(`${label} failed: ${msg.slice(0, 200)}`);
     return fallback;
   }
