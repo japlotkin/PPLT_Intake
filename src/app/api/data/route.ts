@@ -54,16 +54,29 @@ function emptyCases(): CaseAnalytics {
   return { byPracticeArea: [], byStatus: [], byCoCounsel: [], byState: [] };
 }
 
-async function settled<T>(label: string, fn: () => Promise<T>, fallback: T, warnings: string[]): Promise<T> {
+const SECTION_TIMEOUT_MS = 60_000; // 60s per section — no single slow API can take down the whole response
+
+async function settled<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: T,
+  warnings: string[],
+  timeoutMs = SECTION_TIMEOUT_MS
+): Promise<T> {
   const t0 = Date.now();
   try {
-    const r = await fn();
+    const r = await Promise.race<T>([
+      fn(),
+      new Promise<T>((_, rej) =>
+        setTimeout(() => rej(new Error(`section timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+      ),
+    ]);
     console.log(`[/api/data] ${label} ok in ${Date.now() - t0}ms`);
     return r;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[/api/data] ${label} failed after ${Date.now() - t0}ms:`, msg.slice(0, 300));
-    warnings.push(`${label} failed: ${msg.slice(0, 200)}`);
+    warnings.push(`${label}: ${msg.slice(0, 200)}`);
     return fallback;
   }
 }

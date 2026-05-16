@@ -15,9 +15,12 @@ import { GATE_COOKIE, verifyCookieValue } from "@/lib/gate";
 const isGateRoute = createRouteMatcher(["/gate", "/api/gate"]);
 const isSignInRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 const isApiRoute = createRouteMatcher(["/api/(.*)"]);
+// Demo route + its data endpoint render a hand-crafted fixture so the UI can
+// be previewed without GHL/Meta data, gate password, or a Clerk session.
+const isDemoRoute = createRouteMatcher(["/demo", "/api/mock-data"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isGateRoute(req)) return NextResponse.next();
+  if (isGateRoute(req) || isDemoRoute(req)) return NextResponse.next();
 
   // 1. Gate check applies to everything else, including API routes.
   // (Without a valid firm password cookie, we won't expose any data.)

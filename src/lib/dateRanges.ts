@@ -168,33 +168,34 @@ export const PRESETS: { value: Preset; label: string }[] = [
   { value: "custom", label: "Custom range" },
 ];
 
-/** Build the rolling list of completed months for the KPI table (this year so far). */
+/**
+ * KPI table months -- current month + the previous two.
+ *
+ * Earlier we fetched every month YTD, which meant 5+ months × 2 buckets
+ * × pages of contacts = the dominant 504-trigger. 3 months is enough to
+ * see month-over-month trend; older history is in the quarter rollup.
+ */
 export function monthsThisYear(now = new Date()): Range[] {
   const local = nowLocal(now);
-  const cur = startOfMonth(local);
-  const start = startOfYear(local);
   const out: Range[] = [];
-  let m = start;
-  while (m <= cur) {
+  for (let offset = 2; offset >= 0; offset--) {
+    const m = startOfMonth(subMonths(local, offset));
     const next = startOfMonth(addMonths(m, 1));
     out.push({
       start: toUtc(m),
       end: toUtc(next),
       label: m.toLocaleString("en-US", { month: "short", year: "numeric" }),
     });
-    m = next;
   }
   return out;
 }
 
-/** Build the rolling list of completed quarters for the KPI table (this year so far). */
+/** KPI table quarters -- current + previous. */
 export function quartersThisYear(now = new Date()): Range[] {
   const local = nowLocal(now);
-  const cur = startOfQuarter(local);
-  const start = startOfYear(local);
   const out: Range[] = [];
-  let q = start;
-  while (q <= cur) {
+  for (let offset = 1; offset >= 0; offset--) {
+    const q = startOfQuarter(subQuarters(local, offset));
     const next = startOfQuarter(addQuarters(q, 1));
     const qNum = Math.floor(q.getMonth() / 3) + 1;
     out.push({
@@ -202,7 +203,6 @@ export function quartersThisYear(now = new Date()): Range[] {
       end: toUtc(next),
       label: `Q${qNum} ${q.getFullYear()}`,
     });
-    q = next;
   }
   return out;
 }
