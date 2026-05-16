@@ -38,7 +38,7 @@ async function fetchWithRetry(
   init: RequestInit,
   opts: ReqOptions = {}
 ): Promise<Response> {
-  const { retries = 6, timeoutMs = 45_000 } = opts;
+  const { retries = 10, timeoutMs = 60_000 } = opts;
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     await acquire();
@@ -50,13 +50,11 @@ async function fetchWithRetry(
       release();
       if (res.status === 429) {
         const retryAfter = Number(res.headers.get("retry-after") ?? 0);
-        const baseWait =
-          retryAfter > 0
-            ? retryAfter * 1000
-            : 1000 + 500 * Math.pow(2, attempt) + Math.random() * 500;
-        notify429(baseWait);
+        // notify the bucket; it'll pause >= 10s. We add light jitter on top
+        // so concurrent 429s don't all wake at the same instant.
+        notify429(retryAfter > 0 ? retryAfter * 1000 : undefined);
         if (attempt < retries) {
-          await sleep(baseWait);
+          await sleep(200 + Math.random() * 400);
           continue;
         }
       }

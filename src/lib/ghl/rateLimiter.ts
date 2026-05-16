@@ -7,9 +7,12 @@
  * the next request doesn't immediately re-trigger.
  */
 
-const RATE_PER_SECOND = 8;
-const MAX_IN_FLIGHT = 4;
+// GHL's documented limit is 100 req/10s but in practice /opportunities/search
+// throttles harder. 5 req/s steady, max 2 in-flight keeps us well under.
+const RATE_PER_SECOND = 5;
+const MAX_IN_FLIGHT = 2;
 const REFILL_INTERVAL_MS = 1000 / RATE_PER_SECOND;
+const MIN_PAUSE_ON_429_MS = 10_000; // full GHL 10s window
 
 let tokens = RATE_PER_SECOND;
 let lastRefill = Date.now();
@@ -57,8 +60,14 @@ export function release() {
   tryWake();
 }
 
-/** Called when a 429 lands: pause the bucket briefly so we don't pile on. */
-export function notify429(retryAfterMs = 2000) {
-  pauseUntil = Math.max(pauseUntil, Date.now() + retryAfterMs);
-  setTimeout(tryWake, retryAfterMs + 50).unref?.();
+/**
+ * Called when a 429 lands: pause the whole bucket so concurrent requests
+ * don't immediately re-trigger the limit. We pause for at least one full
+ * GHL window (10s) even if Retry-After is shorter or absent.
+ */
+export function notify429(retryAfterMs = MIN_PAUSE_ON_429_MS) {
+  const wait = Math.max(retryAfterMs, MIN_PAUSE_ON_429_MS);
+  pauseUntil = Math.max(pauseUntil, Date.now() + wait);
+  tokens = 0; // drain the bucket so refill starts fresh
+  setTimeout(tryWake, wait + 50).unref?.();
 }
