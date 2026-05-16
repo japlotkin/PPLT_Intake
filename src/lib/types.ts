@@ -195,6 +195,42 @@ export interface CaseAnalytics {
   referralBrokersSigned?: { lexamica: number; litify: number };
 }
 
+// ----- cost analytics -----
+export interface AdCostRow {
+  adId: string;
+  adName: string;
+  adsetName: string;
+  campaignName: string;
+  account: "pplt" | "workersComp" | "abogado";
+  practiceArea: string;
+  spend: number;
+  leadsMeta: number;
+  signed: number;
+  cpl: number | null;
+  cpsc: number | null;
+}
+
+export interface PracticeAreaCostRow {
+  area: string;
+  spend: number;
+  leadsMeta: number;
+  signed: number;
+  cpl: number | null;
+  cpsc: number | null;
+  adCount: number;
+}
+
+export interface CostAnalyticsPayload {
+  windowLabel: string;
+  totalSpend: number;
+  totalLeadsMeta: number;
+  totalSigned: number;
+  totalCpl: number | null;
+  totalCpsc: number | null;
+  byAd: AdCostRow[];
+  byPracticeArea: PracticeAreaCostRow[];
+}
+
 // ----- top-level payload -----
 export interface DashboardData {
   generatedAt: string; // ISO
@@ -208,6 +244,7 @@ export interface DashboardData {
   cases: CaseAnalytics; // combined view (English + Spanish)
   casesEnglish?: CaseAnalytics; // PPLT-only
   casesSpanish?: CaseAnalytics; // Abogado-only
+  cost?: CostAnalyticsPayload; // Meta CPL/CPSC per ad + per practice area
   warnings: string[]; // non-fatal data issues we want to surface
   // Snapshot metadata (added when read from KV). Optional because the
   // mock-data endpoint doesn't set these.

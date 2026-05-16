@@ -7,10 +7,11 @@ import {
   UserPlus,
   CheckCircle2,
   Briefcase,
-  Star,
   Activity,
   TrendingUp,
   Sparkles,
+  DollarSign,
+  Target,
 } from "lucide-react";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DeltaPill } from "@/components/DeltaPill";
@@ -58,7 +59,7 @@ function initials(name: string): string {
 const SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "kpi", label: "KPIs" },
-  { id: "email", label: "Email" },
+  { id: "cost", label: "Ad Cost" },
   { id: "leads", label: "Lead Analytics" },
   { id: "intake", label: "Intake Team" },
   { id: "cases", label: "Case Analytics" },
@@ -285,7 +286,7 @@ export default function DashboardView({
           <>
             <Overview data={data} />
             <Kpi data={data} />
-            <EmailBlock data={data} />
+            <CostBlock data={data} />
             <LeadsBlock data={data} />
             <IntakeTeamBlock data={data} />
             <CasesBlock data={data} />
@@ -364,31 +365,7 @@ export default function DashboardView({
             label="Active Cases (total)"
             value={o.activeTotal.toLocaleString()}
           />
-          <StatCard
-            icon={Star}
-            label="Google Reviews · Lifetime"
-            value={o.reviews.lifetime.toLocaleString()}
-            sub={`Week ${o.reviews.week} · Month ${o.reviews.month} · YTD ${o.reviews.year}`}
-          />
         </div>
-        {o.reviews.perProfile.length > 0 && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {o.reviews.perProfile.map((p) => (
-              <div
-                key={p.name}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3"
-              >
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  {p.name}
-                </div>
-                <div className="mt-1 text-xl font-semibold tabular-nums text-slate-900">
-                  {p.lifetime.toLocaleString()}
-                  <span className="ml-1 text-xs font-normal text-slate-500">reviews</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
     );
   }
@@ -426,82 +403,130 @@ export default function DashboardView({
     );
   }
 
-  function EmailBlock({ data }: { data: DashboardData }) {
-    if (!data.email || data.email.length === 0) return null;
+  // Email + Reviews removed per Jason: GHL public API doesn't expose
+  // email campaign stats, and the Reputation endpoint needs a PIT scope
+  // we don't have. Will revisit once we have a real data source.
+
+  function CostBlock({ data }: { data: DashboardData }) {
+    const c = data.cost;
+    if (!c) return null;
+    const fmtUsd = (n: number) =>
+      `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    const fmtUsd2 = (n: number | null) =>
+      n === null ? "—" : `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
     return (
-      <section id="email">
+      <section id="cost">
         <SectionHeader
-          title="Email"
-          subtitle="GHL email campaigns by bucket, current range"
+          title="Ad Cost"
+          subtitle="Meta ad spend joined with GHL signed-case attribution (window-mismatch caveat: a May sign-up from an April ad won't be credited inside April)"
         />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {data.email.map((b) => {
-            const openRate = b.sends > 0 ? (b.opens / b.sends) * 100 : 0;
-            const clickRate = b.sends > 0 ? (b.clicks / b.sends) * 100 : 0;
-            return (
-              <div
-                key={b.bucket}
-                className="rounded-xl border border-slate-200 bg-white p-5"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-semibold text-slate-900 capitalize flex items-center gap-2">
-                    {b.bucket}
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium uppercase tracking-wider">
-                      {b.bucket === "spanish" ? "Abogado" : "PPLT"}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 tabular-nums">
-                    {openRate.toFixed(1)}% open · {clickRate.toFixed(1)}% click
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <EmailMetric label="Sends" value={b.sends} />
-                  <EmailMetric label="Opens" value={b.opens} />
-                  <EmailMetric label="Clicks" value={b.clicks} />
-                  <EmailMetric label="Replies" value={b.replies} />
-                  <EmailMetric label="Unsubs" value={b.unsubscribes} />
-                  <EmailMetric
-                    label="Signed ≤30d"
-                    value={b.signedWithin30dOfReply}
-                    emphasized
-                  />
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            icon={DollarSign}
+            label="Meta Spend"
+            value={fmtUsd(c.totalSpend)}
+            sub={`${c.windowLabel}`}
+          />
+          <StatCard
+            icon={Users}
+            label="Leads (Meta)"
+            value={c.totalLeadsMeta.toLocaleString()}
+            sub={`Ads Manager 'lead' action`}
+          />
+          <StatCard
+            icon={Target}
+            label="Cost Per Lead"
+            value={fmtUsd2(c.totalCpl)}
+            sub={`Spend / Meta leads`}
+          />
+          <StatCard
+            icon={CheckCircle2}
+            label="Cost Per Signed"
+            value={fmtUsd2(c.totalCpsc)}
+            sub={`Signed in window via ad attribution`}
+          />
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
+            By Practice Area
+          </h3>
+          <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+            <table className="w-full text-sm min-w-[900px]">
+              <thead className="bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-500">
+                <tr className="border-b border-slate-200">
+                  <th className="text-left px-5 py-2.5 font-semibold">Practice area</th>
+                  <th className="text-right px-5 py-2.5 font-semibold">Ads</th>
+                  <th className="text-right px-5 py-2.5 font-semibold">Spend</th>
+                  <th className="text-right px-5 py-2.5 font-semibold">Leads</th>
+                  <th className="text-right px-5 py-2.5 font-semibold">Signed</th>
+                  <th className="text-right px-5 py-2.5 font-semibold">CPL</th>
+                  <th className="text-right px-5 py-2.5 font-semibold text-blue-700">CPSC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.byPracticeArea.length === 0 ? (
+                  <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
+                ) : c.byPracticeArea.map((r) => (
+                  <tr key={r.area} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-5 py-2.5 font-medium text-slate-800">{r.area}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.adCount}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">{r.leadsMeta.toLocaleString()}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">{r.signed.toLocaleString()}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
+            Per Ad · top 40 by spend
+          </h3>
+          <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+            <table className="w-full text-sm min-w-[1100px]">
+              <thead className="bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-500">
+                <tr className="border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5 font-semibold">Ad</th>
+                  <th className="text-left px-4 py-2.5 font-semibold">Campaign</th>
+                  <th className="text-left px-4 py-2.5 font-semibold">Account</th>
+                  <th className="text-left px-4 py-2.5 font-semibold">Area</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">Spend</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">Leads</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">Signed</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">CPL</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-blue-700">CPSC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.byAd.length === 0 ? (
+                  <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-400 text-sm">No ads with spend in this window.</td></tr>
+                ) : c.byAd.slice(0, 40).map((r, i) => (
+                  <tr key={r.adId + i} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
+                    <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={r.adName}>{r.adName}</td>
+                    <td className="px-4 py-2.5 text-slate-600 max-w-[220px] truncate" title={r.campaignName}>{r.campaignName}</td>
+                    <td className="px-4 py-2.5 text-[11px]">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium uppercase tracking-wider">
+                        {r.account === "workersComp" ? "WC" : r.account.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600 text-[11px]">{r.practiceArea === "unknown" ? "—" : r.practiceArea}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{r.leadsMeta}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{r.signed}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
-    );
-  }
-
-  function EmailMetric({
-    label,
-    value,
-    emphasized,
-  }: {
-    label: string;
-    value: number;
-    emphasized?: boolean;
-  }) {
-    return (
-      <div
-        className={`rounded-lg ${
-          emphasized
-            ? "bg-blue-50 ring-1 ring-blue-100"
-            : "bg-slate-50/60"
-        } px-3 py-2`}
-      >
-        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
-          {label}
-        </div>
-        <div
-          className={`mt-1 text-base tabular-nums font-semibold ${
-            emphasized ? "text-blue-700" : "text-slate-900"
-          }`}
-        >
-          {value.toLocaleString()}
-        </div>
-      </div>
     );
   }
 

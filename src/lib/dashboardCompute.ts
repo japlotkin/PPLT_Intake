@@ -17,11 +17,11 @@ import { kpiTable } from "./metrics/kpi";
 import { leadAnalyticsForBucket } from "./metrics/leadAnalytics";
 import { intakeTeamMetrics } from "./metrics/intakeTeam";
 import { caseAnalytics } from "./metrics/caseAnalytics";
-import { emailMetricsByBucket } from "./metrics/email";
+import { costAnalytics } from "./metrics/costAnalytics";
 import type {
   CaseAnalytics,
+  CostAnalyticsPayload,
   DashboardData,
-  EmailMetrics,
   IntakeMemberMetrics,
   KpiBlock,
   LeadAnalytics,
@@ -123,7 +123,7 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     cases,
     casesEnglish,
     casesSpanish,
-    email,
+    cost,
   ] = await Promise.all([
     settled<OverviewData>("Overview", () => overview(), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
     settled<{ months: KpiBlock[]; quarters: KpiBlock[] }>(
@@ -161,39 +161,38 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     settled<CaseAnalytics>("Case analytics (combined)", () => caseAnalytics("combined"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
     settled<CaseAnalytics>("Case analytics (English)", () => caseAnalytics("english"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
     settled<CaseAnalytics>("Case analytics (Spanish)", () => caseAnalytics("spanish"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
-    settled<EmailMetrics[]>(
-      "Email metrics",
-      () => emailMetricsByBucket(range.start, range.end),
-      [],
+    settled<CostAnalyticsPayload>(
+      "Cost analytics",
+      () => costAnalytics(range.start, range.end, range.label),
+      {
+        windowLabel: range.label,
+        totalSpend: 0,
+        totalLeadsMeta: 0,
+        totalSigned: 0,
+        totalCpl: null,
+        totalCpsc: null,
+        byAd: [],
+        byPracticeArea: [],
+      },
       warnings,
       SECTION_TIMEOUT_MS,
       log
     ),
   ]);
 
-  if (overviewData.reviews.lifetime === 0 && overviewData.reviews.perProfile.length === 0) {
-    warnings.push(
-      "Google reviews: GHL PIT lacks the Reputation > Read scope. Regenerate the PIT with that scope to populate this section."
-    );
-  }
-  if (email.length === 0 || email.every((b) => b.sends === 0 && b.opens === 0)) {
-    warnings.push(
-      "Email metrics: GHL's public API doesn't expose campaign stats (route returns 'not yet supported by IAM Service'). The emailRX plugin stores its own metrics — wire those separately if needed."
-    );
-  }
-
   return {
     generatedAt: new Date().toISOString(),
     range: { label: range.label, start: range.start.toISOString(), end: range.end.toISOString() },
     overview: overviewData,
     kpi,
-    email,
+    email: [], // deprecated; UI no longer renders this section
     leadsEnglish,
     leadsSpanish,
     intakeTeam,
     cases,
     casesEnglish,
     casesSpanish,
+    cost,
     warnings,
   };
 }
