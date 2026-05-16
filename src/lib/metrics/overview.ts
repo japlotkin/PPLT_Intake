@@ -4,11 +4,7 @@
  */
 import { contactsInRange } from "../ghl/contacts";
 import { reviewCounts } from "../ghl/reviews";
-import {
-  authAbogado,
-  authPplt,
-  bothAuths,
-} from "../ghl/client";
+import { authAbogado, authPplt, bothAuths } from "../ghl/client";
 import {
   activeNow,
   classifyOpportunities,
@@ -125,7 +121,6 @@ export async function overview(now = new Date()): Promise<OverviewData> {
     sigMPrev,
     sigW,
     sigWPrev,
-    reviewBlock,
   ] = await Promise.all([
     leadsInRange(thisMonth.start, thisMonth.end),
     leadsInRange(lastMonth.start, lastMonth.end),
@@ -139,7 +134,14 @@ export async function overview(now = new Date()): Promise<OverviewData> {
     signedInRange(opps.abogado, opps.pplt, lastMonth.start, lastMonth.end),
     signedInRange(opps.abogado, opps.pplt, thisWeek.start, thisWeek.end),
     signedInRange(opps.abogado, opps.pplt, lastWeek.start, lastWeek.end),
+  ]);
+
+  // Reviews fetched separately with a hard 15s budget so a slow GHL
+  // reputation endpoint can't block the rest of Overview. Returns null
+  // on timeout; the dashboard surfaces "reviews unavailable".
+  const reviewBlock = await Promise.race([
     reviewCounts(bothAuths()),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000)),
   ]);
 
   const activeTotal =

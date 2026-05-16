@@ -36,7 +36,10 @@ interface SearchResp {
 }
 
 const STREAM_TTL_MS = 5 * 60_000;
-const CONTACT_WALK_DAYS = 180;
+// KPI table only goes back current quarter + last quarter (max ~6 months).
+// Overview only goes back to last month. 100 days is enough for both with
+// a small buffer for week-vs-last-week deltas; keeps pagination tractable.
+const CONTACT_WALK_DAYS = 100;
 
 type StreamCacheEntry = { expires: number; promise: Promise<RawContact[]> };
 const streamCache = new Map<string, StreamCacheEntry>();
