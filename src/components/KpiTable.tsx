@@ -1,6 +1,18 @@
+"use client";
+
 import type { KpiBlock } from "@/lib/types";
+import { parseSortable, SortHeader, useSortable } from "./sortable";
+
+type KpiCol = "label" | "spanish" | "english" | "total";
 
 export function KpiTable({ block }: { block: KpiBlock }) {
+  const { sorted, sortKey, sortDir, onSort } = useSortable<typeof block.rows[number], KpiCol>(
+    block.rows,
+    null,
+    "desc",
+    (r, k) => (k === "label" ? r.label : parseSortable(r[k]))
+  );
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between">
@@ -9,16 +21,16 @@ export function KpiTable({ block }: { block: KpiBlock }) {
         </div>
       </div>
       <table className="w-full text-sm">
-        <thead className="bg-slate-50/40 text-[11px] uppercase tracking-wider text-slate-500">
+        <thead className="bg-slate-50/40">
           <tr className="border-b border-slate-200">
-            <th className="text-left px-5 py-2.5 font-semibold">Metric</th>
-            <th className="text-right px-5 py-2.5 font-semibold">Spanish</th>
-            <th className="text-right px-5 py-2.5 font-semibold">English</th>
-            <th className="text-right px-5 py-2.5 font-semibold text-blue-700">Total</th>
+            <SortHeader label="Metric" columnKey="label" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" className="px-5" />
+            <SortHeader label="Spanish" columnKey="spanish" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+            <SortHeader label="English" columnKey="english" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+            <SortHeader label="Total" columnKey="total" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
           </tr>
         </thead>
         <tbody>
-          {block.rows.map((r, i) => (
+          {sorted.map((r, i) => (
             <tr
               key={i}
               className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors"

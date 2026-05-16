@@ -21,8 +21,14 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { StatCard } from "@/components/StatCard";
 import { BarCount } from "@/components/charts/BarCount";
 import { Pie } from "@/components/charts/Pie";
+import { SortHeader, useSortable } from "@/components/sortable";
 import type { Preset } from "@/lib/dateRanges";
-import type { DashboardData } from "@/lib/types";
+import type {
+  AdCostRow,
+  DashboardData,
+  IntakeMemberMetrics,
+  PracticeAreaCostRow,
+} from "@/lib/types";
 
 interface DashboardViewProps {
   /** API endpoint to fetch DashboardData from. Defaults to /api/data. */
@@ -453,82 +459,133 @@ export default function DashboardView({
           <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
             By Practice Area
           </h3>
-          <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
-              <thead className="bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-500">
-                <tr className="border-b border-slate-200">
-                  <th className="text-left px-5 py-2.5 font-semibold">Practice area</th>
-                  <th className="text-right px-5 py-2.5 font-semibold">Ads</th>
-                  <th className="text-right px-5 py-2.5 font-semibold">Spend</th>
-                  <th className="text-right px-5 py-2.5 font-semibold">Leads</th>
-                  <th className="text-right px-5 py-2.5 font-semibold">Signed</th>
-                  <th className="text-right px-5 py-2.5 font-semibold">CPL</th>
-                  <th className="text-right px-5 py-2.5 font-semibold text-blue-700">CPSC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {c.byPracticeArea.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
-                ) : c.byPracticeArea.map((r) => (
-                  <tr key={r.area} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
-                    <td className="px-5 py-2.5 font-medium text-slate-800">{r.area}</td>
-                    <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.adCount}</td>
-                    <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
-                    <td className="px-5 py-2.5 text-right tabular-nums">{r.leadsMeta.toLocaleString()}</td>
-                    <td className="px-5 py-2.5 text-right tabular-nums">{r.signed.toLocaleString()}</td>
-                    <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
-                    <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PracticeAreaCostTable rows={c.byPracticeArea} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
 
         <div className="mt-6">
           <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
             Per Ad · top 40 by spend
           </h3>
-          <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-            <table className="w-full text-sm min-w-[1100px]">
-              <thead className="bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-500">
-                <tr className="border-b border-slate-200">
-                  <th className="text-left px-4 py-2.5 font-semibold">Ad</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Campaign</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Account</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Area</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Spend</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Leads</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Signed</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">CPL</th>
-                  <th className="text-right px-4 py-2.5 font-semibold text-blue-700">CPSC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {c.byAd.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-400 text-sm">No ads with spend in this window.</td></tr>
-                ) : c.byAd.slice(0, 40).map((r, i) => (
-                  <tr key={r.adId + i} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
-                    <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={r.adName}>{r.adName}</td>
-                    <td className="px-4 py-2.5 text-slate-600 max-w-[220px] truncate" title={r.campaignName}>{r.campaignName}</td>
-                    <td className="px-4 py-2.5 text-[11px]">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium uppercase tracking-wider">
-                        {r.account === "workersComp" ? "WC" : r.account.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600 text-[11px]">{r.practiceArea === "unknown" ? "—" : r.practiceArea}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{r.leadsMeta}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{r.signed}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdCostTable rows={c.byAd.slice(0, 40)} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
       </section>
+    );
+  }
+
+  function PracticeAreaCostTable({
+    rows,
+    fmtUsd,
+    fmtUsd2,
+  }: {
+    rows: PracticeAreaCostRow[];
+    fmtUsd: (n: number) => string;
+    fmtUsd2: (n: number | null) => string;
+  }) {
+    type Col = "area" | "adCount" | "spend" | "leadsMeta" | "signed" | "cpl" | "cpsc";
+    const { sorted, sortKey, sortDir, onSort } = useSortable<PracticeAreaCostRow, Col>(
+      rows,
+      "spend",
+      "desc",
+      (r, k) => r[k] as string | number | null
+    );
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[900px]">
+          <thead className="bg-slate-50/60">
+            <tr className="border-b border-slate-200">
+              <SortHeader label="Practice area" columnKey="area" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" className="px-5" />
+              <SortHeader label="Ads" columnKey="adCount" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Spend" columnKey="spend" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Leads" columnKey="leadsMeta" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
+            ) : sorted.map((r) => (
+              <tr key={r.area} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                <td className="px-5 py-2.5 font-medium text-slate-800">{r.area}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.adCount}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{r.leadsMeta.toLocaleString()}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{r.signed.toLocaleString()}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  function AdCostTable({
+    rows,
+    fmtUsd,
+    fmtUsd2,
+  }: {
+    rows: AdCostRow[];
+    fmtUsd: (n: number) => string;
+    fmtUsd2: (n: number | null) => string;
+  }) {
+    type Col =
+      | "adName"
+      | "campaignName"
+      | "account"
+      | "practiceArea"
+      | "spend"
+      | "leadsMeta"
+      | "signed"
+      | "cpl"
+      | "cpsc";
+    const { sorted, sortKey, sortDir, onSort } = useSortable<AdCostRow, Col>(
+      rows,
+      "spend",
+      "desc",
+      (r, k) => r[k] as string | number | null
+    );
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[1100px]">
+          <thead className="bg-slate-50/60">
+            <tr className="border-b border-slate-200">
+              <SortHeader label="Ad" columnKey="adName" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
+              <SortHeader label="Campaign" columnKey="campaignName" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
+              <SortHeader label="Account" columnKey="account" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
+              <SortHeader label="Area" columnKey="practiceArea" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
+              <SortHeader label="Spend" columnKey="spend" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="Leads" columnKey="leadsMeta" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-400 text-sm">No ads with spend in this window.</td></tr>
+            ) : sorted.map((r, i) => (
+              <tr key={r.adId + i} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
+                <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={r.adName}>{r.adName}</td>
+                <td className="px-4 py-2.5 text-slate-600 max-w-[220px] truncate" title={r.campaignName}>{r.campaignName}</td>
+                <td className="px-4 py-2.5 text-[11px]">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium uppercase tracking-wider">
+                    {r.account === "workersComp" ? "WC" : r.account.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-slate-600 text-[11px]">{r.practiceArea === "unknown" ? "—" : r.practiceArea}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{r.leadsMeta}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{r.signed}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
@@ -622,7 +679,51 @@ export default function DashboardView({
   }
 
   function IntakeTeamBlock({ data }: { data: DashboardData }) {
-    if (!data.intakeTeam || data.intakeTeam.length === 0) {
+    return (
+      <IntakeTeamTable rows={data.intakeTeam ?? []} />
+    );
+  }
+
+  function IntakeTeamTable({ rows }: { rows: IntakeMemberMetrics[] }) {
+    type Col =
+      | "name"
+      | "referrals"
+      | "signedFromReferrals"
+      | "callsInbound"
+      | "callsOutbound"
+      | "sms"
+      | "avgPickupSeconds"
+      | "referrals30"
+      | "referrals7"
+      | "signed30"
+      | "signed7"
+      | "activeFromReferrals";
+
+    const { sorted, sortKey, sortDir, onSort } = useSortable<IntakeMemberMetrics, Col>(
+      rows,
+      "referrals",
+      "desc",
+      (r, k) => {
+        switch (k) {
+          case "name":
+            return r.name;
+          case "referrals30":
+            return r.referrals30.current;
+          case "referrals7":
+            return r.referrals7.current;
+          case "signed30":
+            return r.signed30.current;
+          case "signed7":
+            return r.signed7.current;
+          case "avgPickupSeconds":
+            return r.avgPickupSeconds ?? null;
+          default:
+            return r[k] as number;
+        }
+      }
+    );
+
+    if (!rows || rows.length === 0) {
       return (
         <section id="intake">
           <SectionHeader title="Intake Team" />
@@ -630,32 +731,33 @@ export default function DashboardView({
         </section>
       );
     }
+
     return (
       <section id="intake">
         <SectionHeader
           title="Intake Team"
-          subtitle="Per-member referrals, calls, SMS, and trends"
+          subtitle="Per-member referrals, calls, SMS, and trends · click any column to sort"
         />
         <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
           <table className="w-full text-sm min-w-[1100px]">
-            <thead className="bg-slate-50/60 text-[11px] uppercase tracking-wider text-slate-500">
+            <thead className="bg-slate-50/60">
               <tr className="border-b border-slate-200">
-                <th className="text-left px-4 py-2.5 font-semibold">Member</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Referrals</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Signed (from ref.)</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Calls In</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Calls Out</th>
-                <th className="text-right px-4 py-2.5 font-semibold">SMS</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Avg call</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Ref 30d</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Ref 7d</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Signed 30d</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Signed 7d</th>
-                <th className="text-right px-4 py-2.5 font-semibold text-blue-700">Active</th>
+                <SortHeader label="Member" columnKey="name" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
+                <SortHeader label="Referrals" columnKey="referrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Signed" columnKey="signedFromReferrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Calls In" columnKey="callsInbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Calls Out" columnKey="callsOutbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="SMS" columnKey="sms" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Avg call" columnKey="avgPickupSeconds" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Ref 30d" columnKey="referrals30" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Ref 7d" columnKey="referrals7" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Signed 30d" columnKey="signed30" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Signed 7d" columnKey="signed7" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Active" columnKey="activeFromReferrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
               </tr>
             </thead>
             <tbody>
-              {data.intakeTeam.map((m, i) => (
+              {sorted.map((m, i) => (
                 <tr
                   key={m.userId}
                   className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}
