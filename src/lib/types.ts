@@ -264,4 +264,10 @@ export interface DashboardData {
   // mock-data endpoint doesn't set these.
   syncedAt?: string;
   syncDurationMs?: number;
+  // Per-user visibility (resolved at request time from current Clerk user)
+  visibility?: {
+    sections: Record<string, boolean>;
+    subsections: Record<string, boolean>;
+    isAdmin: boolean;
+  };
 }

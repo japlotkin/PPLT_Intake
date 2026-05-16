@@ -1,15 +1,14 @@
 /**
  * GET /api/data?preset=this_month
  *
- * Reads the snapshot for the requested preset from KV. The sync route
- * pre-computes snapshots for every preset in SYNCED_PRESETS.
- *
- * If the requested preset isn't pre-computed (or no snapshots exist),
- * readSnapshot falls back to "this_month".
+ * Reads the snapshot for the requested preset from KV, attaches the
+ * current user's visibility config, and returns it.
  */
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { readSnapshot } from "@/lib/snapshotStore";
+import { env } from "@/lib/env";
+import { readVisibility, toClientVisibility } from "@/lib/visibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,9 +34,16 @@ export async function GET(req: Request) {
     );
   }
 
+  // Attach visibility for the current user
+  const me = await currentUser();
+  const myEmail = me?.primaryEmailAddress?.emailAddress ?? "";
+  const cfg = myEmail ? await readVisibility(myEmail) : null;
+  const visibility = toClientVisibility(cfg, myEmail, env.adminEmail());
+
   return NextResponse.json({
     ...envelope.data,
     syncedAt: envelope.syncedAt,
     syncDurationMs: envelope.durationMs,
+    visibility,
   });
 }

@@ -1,0 +1,155 @@
+/**
+ * Per-user dashboard section visibility.
+ *
+ * Stored in Vercel KV under `dash:visibility:<email-lowercase>`. The schema
+ * is *deny-list* style: absent = visible (so a brand-new user sees the full
+ * dashboard until an admin restricts something). Sections and subsections
+ * can each be hidden independently.
+ *
+ * The admin (ADMIN_EMAIL) is force-visible everywhere regardless of config
+ * to prevent lockout.
+ */
+import { kv } from "@vercel/kv";
+import { env } from "./env";
+
+export const SECTION_IDS = [
+  "overview",
+  "kpi",
+  "cost",
+  "leads",
+  "intake",
+  "cases",
+] as const;
+export type SectionId = (typeof SECTION_IDS)[number];
+
+// Subsection ids are namespaced under their parent section so the storage
+// schema is flat and easy to display in the admin UI.
+export const SUBSECTIONS_BY_SECTION: Record<SectionId, readonly string[]> = {
+  overview: [],
+  kpi: ["by_month", "by_quarter"],
+  cost: ["headline", "by_practice_area", "by_area_state", "per_ad"],
+  leads: ["english_sources", "spanish_sources", "english_status", "spanish_status"],
+  intake: [],
+  cases: ["by_practice_area", "by_state", "active_co_counsel", "signed_co_counsel"],
+};
+
+export const SECTION_LABELS: Record<SectionId, string> = {
+  overview: "Overview",
+  kpi: "KPIs",
+  cost: "Ad Cost",
+  leads: "Lead Analytics",
+  intake: "Intake Team",
+  cases: "Case Analytics",
+};
+
+export const SUBSECTION_LABELS: Record<string, string> = {
+  "kpi.by_month": "By Month",
+  "kpi.by_quarter": "By Quarter",
+  "cost.headline": "Headline stats (Spend / Leads / CPL / CPSC)",
+  "cost.by_practice_area": "By Practice Area",
+  "cost.by_area_state": "By Area × State",
+  "cost.per_ad": "Per Ad",
+  "leads.english_sources": "English Sources pie",
+  "leads.spanish_sources": "Spanish Sources pie",
+  "leads.english_status": "English Leads by Status",
+  "leads.spanish_status": "Spanish Leads by Status",
+  "cases.by_practice_area": "By Practice Area",
+  "cases.by_state": "By State",
+  "cases.active_co_counsel": "Active at Co-Counsel Firm",
+  "cases.signed_co_counsel": "Signed by Co-Counsel Firm",
+};
+
+export interface VisibilityConfig {
+  email: string;
+  /** Section IDs the user should NOT see. */
+  hiddenSections: SectionId[];
+  /** Subsection IDs (namespaced "<section>.<sub>") the user should NOT see. */
+  hiddenSubsections: string[];
+  updatedAt: string;
+  updatedBy: string;
+}
+
+const KV_PREFIX = "visibility:";
+function kvKey(email: string): string {
+  return KV_PREFIX + email.toLowerCase();
+}
+
+export async function readVisibility(email: string): Promise<VisibilityConfig | null> {
+  if (!env.kv.enabled()) return null;
+  return ((await kv.get<VisibilityConfig>(kvKey(email))) ?? null);
+}
+
+export async function writeVisibility(cfg: VisibilityConfig): Promise<void> {
+  if (!env.kv.enabled()) {
+    throw new Error("KV not configured");
+  }
+  await kv.set(kvKey(cfg.email), cfg);
+}
+
+export async function listAllVisibility(): Promise<VisibilityConfig[]> {
+  if (!env.kv.enabled()) return [];
+  const keys = await kv.keys(KV_PREFIX + "*");
+  if (keys.length === 0) return [];
+  const results = await Promise.all(keys.map((k) => kv.get<VisibilityConfig>(k)));
+  return results.filter((x): x is VisibilityConfig => x !== null);
+}
+
+/** Returns true if the section is visible to the email. Admin always sees all. */
+export function isSectionVisible(
+  cfg: VisibilityConfig | null,
+  email: string,
+  adminEmail: string,
+  section: SectionId
+): boolean {
+  if (email.toLowerCase() === adminEmail.toLowerCase()) return true;
+  if (!cfg) return true;
+  return !cfg.hiddenSections.includes(section);
+}
+
+export function isSubsectionVisible(
+  cfg: VisibilityConfig | null,
+  email: string,
+  adminEmail: string,
+  section: SectionId,
+  subsection: string
+): boolean {
+  if (email.toLowerCase() === adminEmail.toLowerCase()) return true;
+  if (!cfg) return true;
+  if (cfg.hiddenSections.includes(section)) return false;
+  const key = `${section}.${subsection}`;
+  return !cfg.hiddenSubsections.includes(key);
+}
+
+/** Build a shape the client UI can consume (booleans only, no admin email leak). */
+export interface ClientVisibility {
+  sections: Record<SectionId, boolean>;
+  subsections: Record<string, boolean>;
+  isAdmin: boolean;
+}
+
+export function toClientVisibility(
+  cfg: VisibilityConfig | null,
+  email: string,
+  adminEmail: string
+): ClientVisibility {
+  const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
+  const sections: Record<SectionId, boolean> = {
+    overview: true,
+    kpi: true,
+    cost: true,
+    leads: true,
+    intake: true,
+    cases: true,
+  };
+  const subsections: Record<string, boolean> = {};
+  for (const sec of SECTION_IDS) {
+    for (const sub of SUBSECTIONS_BY_SECTION[sec]) {
+      subsections[`${sec}.${sub}`] = true;
+    }
+  }
+  if (!isAdmin && cfg) {
+    for (const s of cfg.hiddenSections) sections[s] = false;
+    for (const ss of cfg.hiddenSubsections) subsections[ss] = false;
+  }
+  return { sections, subsections, isAdmin };
+}

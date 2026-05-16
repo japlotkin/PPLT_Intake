@@ -65,7 +65,7 @@ function initials(name: string): string {
     .join("");
 }
 
-const SECTIONS = [
+const SECTIONS: Array<{ id: SectionVisId; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "kpi", label: "KPIs" },
   { id: "cost", label: "Ad Cost" },
@@ -74,14 +74,42 @@ const SECTIONS = [
   { id: "cases", label: "Case Analytics" },
 ];
 
-function SectionNav() {
+type SectionVisId = "overview" | "kpi" | "cost" | "leads" | "intake" | "cases";
+
+function isVisible(
+  vis: DashboardData["visibility"],
+  section: SectionVisId
+): boolean {
+  if (!vis) return true;
+  return vis.sections[section] !== false;
+}
+
+function isSubVisible(
+  vis: DashboardData["visibility"],
+  section: SectionVisId,
+  sub: string
+): boolean {
+  if (!vis) return true;
+  if (vis.sections[section] === false) return false;
+  const key = `${section}.${sub}`;
+  return vis.subsections[key] !== false;
+}
+
+function SectionNav({
+  visibility,
+  isAdmin,
+}: {
+  visibility: DashboardData["visibility"];
+  isAdmin: boolean;
+}) {
+  const visible = SECTIONS.filter((s) => isVisible(visibility, s.id));
   return (
     <aside className="hidden lg:block w-48 shrink-0">
       <div className="sticky top-24 space-y-0.5">
         <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 pb-2">
           Sections
         </div>
-        {SECTIONS.map((s) => (
+        {visible.map((s) => (
           <a
             key={s.id}
             href={`#${s.id}`}
@@ -90,6 +118,14 @@ function SectionNav() {
             {s.label}
           </a>
         ))}
+        {isAdmin && (
+          <a
+            href="/admin"
+            className="block mt-4 px-3 py-1.5 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-50/60 transition-colors border-t border-slate-100 pt-3"
+          >
+            Admin →
+          </a>
+        )}
       </div>
     </aside>
   );
@@ -251,7 +287,7 @@ export default function DashboardView({
       </header>
 
       <div className="max-w-[1400px] mx-auto px-6 py-8 flex gap-8">
-        <SectionNav />
+        <SectionNav visibility={data?.visibility} isAdmin={data?.visibility?.isAdmin ?? false} />
         <main className="flex-1 min-w-0 space-y-10">
         {loading && !data && !needsSync && (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center space-y-2">
@@ -313,12 +349,12 @@ export default function DashboardView({
 
         {data && (
           <>
-            <Overview data={data} />
-            <Kpi data={data} />
-            <CostBlock data={data} />
-            <LeadsBlock data={data} />
-            <IntakeTeamBlock data={data} />
-            <CasesBlock data={data} />
+            {isVisible(data.visibility, "overview") && <Overview data={data} />}
+            {isVisible(data.visibility, "kpi") && <Kpi data={data} />}
+            {isVisible(data.visibility, "cost") && <CostBlock data={data} />}
+            {isVisible(data.visibility, "leads") && <LeadsBlock data={data} />}
+            {isVisible(data.visibility, "intake") && <IntakeTeamBlock data={data} />}
+            {isVisible(data.visibility, "cases") && <CasesBlock data={data} />}
             <p className="text-[11px] text-slate-400 text-center pt-8">
               {data.syncedAt ? (
                 <>
@@ -400,6 +436,8 @@ export default function DashboardView({
   }
 
   function Kpi({ data }: { data: DashboardData }) {
+    const showMonths = isSubVisible(data.visibility, "kpi", "by_month");
+    const showQuarters = isSubVisible(data.visibility, "kpi", "by_quarter");
     return (
       <section id="kpi">
         <SectionHeader
@@ -407,26 +445,30 @@ export default function DashboardView({
           subtitle="Spanish vs English, by month and quarter"
         />
         <div className="space-y-6">
-          <div>
-            <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
-              By Month
-            </h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {data.kpi.months.map((b) => (
-                <KpiTable key={b.title} block={b} />
-              ))}
+          {showMonths && (
+            <div>
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
+                By Month
+              </h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {data.kpi.months.map((b) => (
+                  <KpiTable key={b.title} block={b} />
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
-              By Quarter
-            </h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {data.kpi.quarters.map((b) => (
-                <KpiTable key={b.title} block={b} />
-              ))}
+          )}
+          {showQuarters && (
+            <div>
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
+                By Quarter
+              </h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {data.kpi.quarters.map((b) => (
+                  <KpiTable key={b.title} block={b} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     );
@@ -445,39 +487,46 @@ export default function DashboardView({
       n === null
         ? "—"
         : `$${Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    const showHeadline = isSubVisible(data.visibility, "cost", "headline");
+    const showByArea = isSubVisible(data.visibility, "cost", "by_practice_area");
+    const showByAreaState = isSubVisible(data.visibility, "cost", "by_area_state");
+    const showPerAd = isSubVisible(data.visibility, "cost", "per_ad");
     return (
       <section id="cost">
         <SectionHeader
           title="Ad Cost"
           subtitle="Meta ad spend joined with GHL signed-case attribution (window-mismatch caveat: a May sign-up from an April ad won't be credited inside April)"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            icon={DollarSign}
-            label="Meta Spend"
-            value={fmtUsd(c.totalSpend)}
-            sub={`${c.windowLabel}`}
-          />
-          <StatCard
-            icon={Users}
-            label="Leads (Meta)"
-            value={c.totalLeadsMeta.toLocaleString()}
-            sub={`Ads Manager 'lead' action`}
-          />
-          <StatCard
-            icon={Target}
-            label="Cost Per Lead"
-            value={fmtUsd2(c.totalCpl)}
-            sub={`Spend / Meta leads`}
-          />
-          <StatCard
-            icon={CheckCircle2}
-            label="Cost Per Signed"
-            value={fmtUsd2(c.totalCpsc)}
-            sub={`Signed in window via ad attribution`}
-          />
-        </div>
+        {showHeadline && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              icon={DollarSign}
+              label="Meta Spend"
+              value={fmtUsd(c.totalSpend)}
+              sub={`${c.windowLabel}`}
+            />
+            <StatCard
+              icon={Users}
+              label="Leads (Meta)"
+              value={c.totalLeadsMeta.toLocaleString()}
+              sub={`Ads Manager 'lead' action`}
+            />
+            <StatCard
+              icon={Target}
+              label="Cost Per Lead"
+              value={fmtUsd2(c.totalCpl)}
+              sub={`Spend / Meta leads`}
+            />
+            <StatCard
+              icon={CheckCircle2}
+              label="Cost Per Signed"
+              value={fmtUsd2(c.totalCpsc)}
+              sub={`Signed in window via ad attribution`}
+            />
+          </div>
+        )}
 
+        {showByArea && (
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
@@ -503,7 +552,9 @@ export default function DashboardView({
           </div>
           <PracticeAreaCostTable rows={c.byPracticeArea} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
+        )}
 
+        {showByAreaState && (
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-2">
@@ -533,7 +584,9 @@ export default function DashboardView({
           </div>
           <AreaStateCostTable rows={c.byAreaState ?? []} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
+        )}
 
+        {showPerAd && (
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
@@ -588,6 +641,7 @@ export default function DashboardView({
           </div>
           <AdCostTable rows={c.byAd.slice(0, 40)} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
+        )}
       </section>
     );
   }
@@ -766,6 +820,10 @@ export default function DashboardView({
   }
 
   function LeadsBlock({ data }: { data: DashboardData }) {
+    const showEnSrc = isSubVisible(data.visibility, "leads", "english_sources");
+    const showEsSrc = isSubVisible(data.visibility, "leads", "spanish_sources");
+    const showEnStatus = isSubVisible(data.visibility, "leads", "english_status");
+    const showEsStatus = isSubVisible(data.visibility, "leads", "spanish_status");
     return (
       <section id="leads">
         <SectionHeader
@@ -773,36 +831,44 @@ export default function DashboardView({
           subtitle="Sources, status mix, and conversion — current range"
         />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <LeadCard
-            heading="English Sources"
-            badge="PPLT"
-            pieData={data.leadsEnglish.sourceMix.map((r) => ({ name: r.source, value: r.count }))}
-            conversionPct={data.leadsEnglish.conversionRatePct}
-            avgDaysToSigned={data.leadsEnglish.avgDaysToSigned}
-          />
-          <LeadCard
-            heading="Spanish Sources"
-            badge="Abogado"
-            pieData={data.leadsSpanish.sourceMix.map((r) => ({ name: r.source, value: r.count }))}
-            conversionPct={data.leadsSpanish.conversionRatePct}
-            avgDaysToSigned={data.leadsSpanish.avgDaysToSigned}
-          />
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">
-              English — Leads by Status
-            </h3>
-            <BarCount
-              data={data.leadsEnglish.byStatus.map((r) => ({ name: r.status, value: r.count }))}
+          {showEnSrc && (
+            <LeadCard
+              heading="English Sources"
+              badge="PPLT"
+              pieData={data.leadsEnglish.sourceMix.map((r) => ({ name: r.source, value: r.count }))}
+              conversionPct={data.leadsEnglish.conversionRatePct}
+              avgDaysToSigned={data.leadsEnglish.avgDaysToSigned}
             />
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">
-              Spanish — Leads by Status
-            </h3>
-            <BarCount
-              data={data.leadsSpanish.byStatus.map((r) => ({ name: r.status, value: r.count }))}
+          )}
+          {showEsSrc && (
+            <LeadCard
+              heading="Spanish Sources"
+              badge="Abogado"
+              pieData={data.leadsSpanish.sourceMix.map((r) => ({ name: r.source, value: r.count }))}
+              conversionPct={data.leadsSpanish.conversionRatePct}
+              avgDaysToSigned={data.leadsSpanish.avgDaysToSigned}
             />
-          </div>
+          )}
+          {showEnStatus && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                English — Leads by Status
+              </h3>
+              <BarCount
+                data={data.leadsEnglish.byStatus.map((r) => ({ name: r.status, value: r.count }))}
+              />
+            </div>
+          )}
+          {showEsStatus && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                Spanish — Leads by Status
+              </h3>
+              <BarCount
+                data={data.leadsSpanish.byStatus.map((r) => ({ name: r.status, value: r.count }))}
+              />
+            </div>
+          )}
         </div>
       </section>
     );
@@ -1050,12 +1116,17 @@ export default function DashboardView({
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="By Practice Area">
-            <BarCount data={view.byPracticeArea.map((r) => ({ name: r.area, value: r.count }))} />
-          </ChartCard>
-          <ChartCard title="By State" subtitle="State (Jurisdiction) field, top 15">
-            <BarCount data={view.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
-          </ChartCard>
+          {isSubVisible(data.visibility, "cases", "by_practice_area") && (
+            <ChartCard title="By Practice Area">
+              <BarCount data={view.byPracticeArea.map((r) => ({ name: r.area, value: r.count }))} />
+            </ChartCard>
+          )}
+          {isSubVisible(data.visibility, "cases", "by_state") && (
+            <ChartCard title="By State" subtitle="State (Jurisdiction) field, top 15">
+              <BarCount data={view.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
+            </ChartCard>
+          )}
+          {isSubVisible(data.visibility, "cases", "active_co_counsel") && (
           <ChartCard
             title="Active at Co-Counsel Firm"
             subtitle="Top 15 · open referrals (excl. brokers)"
@@ -1071,6 +1142,8 @@ export default function DashboardView({
           >
             <BarCount data={view.byCoCounsel.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
           </ChartCard>
+          )}
+          {isSubVisible(data.visibility, "cases", "signed_co_counsel") && (
           <ChartCard
             title="Signed by Co-Counsel Firm"
             subtitle="Top 15 · firm signed the referred case"
@@ -1086,6 +1159,7 @@ export default function DashboardView({
           >
             <BarCount data={view.byCoCounselSigned.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
           </ChartCard>
+          )}
         </div>
       </>
     );
