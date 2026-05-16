@@ -196,4 +196,8 @@ export interface DashboardData {
   intakeTeam: IntakeMemberMetrics[];
   cases: CaseAnalytics;
   warnings: string[]; // non-fatal data issues we want to surface
+  // Snapshot metadata (added when read from KV). Optional because the
+  // mock-data endpoint doesn't set these.
+  syncedAt?: string;
+  syncDurationMs?: number;
 }

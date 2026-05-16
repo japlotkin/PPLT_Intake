@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync",
+      "schedule": "*/30 * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/sync/route.ts": { "maxDuration": 300 },
+    "src/app/api/refresh/route.ts": { "maxDuration": 300 }
+  }
+}

@@ -55,6 +55,19 @@ function initials(name: string): string {
     .join("");
 }
 
+function timeAgo(iso: string): string {
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
 export default function DashboardView({
   endpoint = "/api/data",
   refreshEndpoint = "/api/refresh",
@@ -66,6 +79,7 @@ export default function DashboardView({
   const [endISO, setEndISO] = useState<string>(todayISO());
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsSync, setNeedsSync] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -82,11 +96,17 @@ export default function DashboardView({
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNeedsSync(null);
     setElapsed(0);
     const t0 = Date.now();
     const tick = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
     try {
       const res = await fetch(`${endpoint}?${queryString}`);
+      if (res.status === 503) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string };
+        setNeedsSync(j.message ?? "No snapshot found. Click Refresh to run the first sync.");
+        return;
+      }
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? `Request failed: ${res.status}`);
@@ -107,11 +127,18 @@ export default function DashboardView({
 
   async function refresh() {
     setRefreshing(true);
+    setError(null);
     try {
       if (refreshEndpoint) {
-        await fetch(refreshEndpoint, { method: "POST" });
+        const res = await fetch(refreshEndpoint, { method: "POST" });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error ?? `Refresh failed: ${res.status}`);
+        }
       }
       await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRefreshing(false);
     }
@@ -164,16 +191,45 @@ export default function DashboardView({
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-10">
-        {loading && !data && (
+        {loading && !data && !needsSync && (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center space-y-2">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
               <RefreshCcw className="h-4 w-4 animate-spin text-blue-600" />
               Loading dashboard data…
             </div>
             <div className="text-xs text-slate-500">
-              {elapsed}s elapsed · first cold load typically takes 60–120s
-              while we walk GHL pipelines + Meta accounts. Subsequent loads
-              are near-instant for an hour.
+              {elapsed}s elapsed · reading latest snapshot from cache.
+            </div>
+          </div>
+        )}
+        {needsSync && !refreshing && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/50 px-6 py-10 text-center space-y-3">
+            <div className="text-sm font-medium text-slate-800">
+              No snapshot found yet
+            </div>
+            <div className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+              {needsSync} The sync walks GHL + Meta and typically takes 60–120 seconds.
+              After that, the dashboard reads in milliseconds and refreshes
+              automatically every 30 minutes.
+            </div>
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 transition shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Run first sync
+            </button>
+          </div>
+        )}
+        {refreshing && !data && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/50 px-6 py-10 text-center space-y-2">
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
+              <RefreshCcw className="h-4 w-4 animate-spin text-blue-600" />
+              Syncing GHL + Meta data…
+            </div>
+            <div className="text-xs text-slate-500">
+              {elapsed}s elapsed · this only takes long on the first run.
             </div>
           </div>
         )}
@@ -202,8 +258,19 @@ export default function DashboardView({
             <IntakeTeamBlock data={data} />
             <CasesBlock data={data} />
             <p className="text-[11px] text-slate-400 text-center pt-8">
-              Generated {new Date(data.generatedAt).toLocaleString()} · Range:{" "}
-              {data.range.label}
+              {data.syncedAt ? (
+                <>
+                  Snapshot synced {timeAgo(data.syncedAt)}
+                  {data.syncDurationMs &&
+                    ` (took ${(data.syncDurationMs / 1000).toFixed(1)}s)`}{" "}
+                  · auto-refreshes every 30 min · click Refresh for fresh-now data
+                </>
+              ) : (
+                <>
+                  Generated {new Date(data.generatedAt).toLocaleString()} · Range:{" "}
+                  {data.range.label}
+                </>
+              )}
             </p>
           </>
         )}
