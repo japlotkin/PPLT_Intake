@@ -175,16 +175,13 @@ export const PRESETS: { value: Preset; label: string }[] = [
 ];
 
 /**
- * KPI table months -- current month + the previous two.
- *
- * Earlier we fetched every month YTD, which meant 5+ months × 2 buckets
- * × pages of contacts = the dominant 504-trigger. 3 months is enough to
- * see month-over-month trend; older history is in the quarter rollup.
+ * KPI table months -- current month + the previous one only.
+ * Older history is in the dedicated "Export Historical KPIs" admin CSV.
  */
 export function monthsThisYear(now = new Date()): Range[] {
   const local = nowLocal(now);
   const out: Range[] = [];
-  for (let offset = 2; offset >= 0; offset--) {
+  for (let offset = 1; offset >= 0; offset--) {
     const m = startOfMonth(subMonths(local, offset));
     const next = startOfMonth(addMonths(m, 1));
     out.push({

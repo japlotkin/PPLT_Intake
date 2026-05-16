@@ -438,12 +438,80 @@ export default function DashboardView({
   function Kpi({ data }: { data: DashboardData }) {
     const showMonths = isSubVisible(data.visibility, "kpi", "by_month");
     const showQuarters = isSubVisible(data.visibility, "kpi", "by_quarter");
+    const isAdmin = data.visibility?.isAdmin ?? false;
+    const [historyMonths, setHistoryMonths] = useState(12);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
+    async function exportHistorical() {
+      setHistoryLoading(true);
+      try {
+        const res = await fetch(`/api/admin/kpi-history?months=${historyMonths}`);
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          alert(j.error ?? `Export failed: ${res.status}`);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `kpi-history-${historyMonths}mo.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+
     return (
       <section id="kpi">
-        <SectionHeader
-          title="KPIs"
-          subtitle="Spanish vs English, by month and quarter"
-        />
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">
+              KPIs
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Spanish vs English · current + previous month, current + last quarter
+            </p>
+          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <select
+                value={historyMonths}
+                onChange={(e) => setHistoryMonths(Number(e.target.value))}
+                disabled={historyLoading}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700"
+              >
+                <option value={6}>Last 6 months</option>
+                <option value={12}>Last 12 months</option>
+                <option value={18}>Last 18 months</option>
+                <option value={24}>Last 24 months</option>
+                <option value={36}>Last 36 months</option>
+              </select>
+              <button
+                type="button"
+                onClick={exportHistorical}
+                disabled={historyLoading}
+                title="Walks contacts + opps back the chosen number of months; can take 60-120s"
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50 transition disabled:opacity-50"
+              >
+                {historyLoading ? (
+                  <>
+                    <span className="inline-block h-3 w-3 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" />
+                    Exporting…
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-3.5 w-3.5" />
+                    Export historical CSV
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
         <div className="space-y-6">
           {showMonths && (
             <div>
