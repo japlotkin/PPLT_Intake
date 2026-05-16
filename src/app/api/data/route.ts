@@ -18,6 +18,8 @@ import { leadAnalyticsForBucket } from "@/lib/metrics/leadAnalytics";
 import { intakeTeamMetrics } from "@/lib/metrics/intakeTeam";
 import { caseAnalytics } from "@/lib/metrics/caseAnalytics";
 import { emailMetricsByBucket } from "@/lib/metrics/email";
+import { authAbogado, authPplt } from "@/lib/ghl/client";
+import { streamOpportunities } from "@/lib/ghl/opportunities";
 import type {
   CaseAnalytics,
   DashboardData,
@@ -102,6 +104,28 @@ export async function GET(req: Request) {
   try {
     const data = await withCache<DashboardData>(cacheKey, ONE_HOUR_SECONDS, async () => {
       const warnings: string[] = [];
+
+      // 1. Pre-warm the opportunity walk for both locations with a generous
+      //    budget (3 minutes). Every section reads from this memoized result,
+      //    so doing it ONCE here means later 60s per-section timeouts cover
+      //    only the section's own work, not a shared upstream walk.
+      const prewarmT0 = Date.now();
+      try {
+        await Promise.race([
+          Promise.all([
+            streamOpportunities(authAbogado()),
+            streamOpportunities(authPplt()),
+          ]),
+          new Promise((_, rej) =>
+            setTimeout(() => rej(new Error("opportunities pre-warm timed out after 180s")), 180_000)
+          ),
+        ]);
+        console.log(`[/api/data] opps pre-warm done in ${Date.now() - prewarmT0}ms`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[/api/data] opps pre-warm failed after ${Date.now() - prewarmT0}ms:`, msg);
+        warnings.push(`Opportunities fetch issue: ${msg.slice(0, 200)} (some sections may be empty)`);
+      }
 
       const [overviewData, kpi, leadsSpanish, leadsEnglish, intakeTeam, cases, email] =
         await Promise.all([

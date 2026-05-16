@@ -17,12 +17,22 @@ import { getV2, GhlAuth } from "./client";
  * The dashboard calls this many times per request (every KPI block, every
  * lead-analytics bucket, intake team, case analytics). Walking ~50k+ opps
  * once and re-using it is dramatically cheaper than re-fetching 14+ times.
- * 90-second TTL is short enough for "fresh-enough" data but spans a single
- * dashboard render comfortably.
+ * 5-minute TTL spans one dashboard render comfortably and survives the
+ * Vercel function's invocation lifetime, so the same opps don't get
+ * re-fetched on every per-section retry.
  */
-const STREAM_TTL_MS = 90_000;
+const STREAM_TTL_MS = 5 * 60_000;
 type StreamCacheEntry = { expires: number; promise: Promise<RawOpportunity[]> };
 const streamCache = new Map<string, StreamCacheEntry>();
+
+/**
+ * Cutoff: only walk opportunities that have changed in the last 180 days.
+ * Old long-dormant opportunities pollute the active-case count and inflate
+ * the walk into a 504-causing fetch. If the firm has a 2-year-old open
+ * case that hasn't been touched, it won't appear -- which is the right
+ * trade-off for a "what's moving" dashboard.
+ */
+const OPP_WALK_DAYS = 180;
 
 export interface RawOpportunity {
   id: string;
@@ -59,12 +69,11 @@ interface SearchResp {
 }
 
 /**
- * Paginate the opportunities search until done.
+ * Paginate the opportunities search, stopping once we've walked past the
+ * OPP_WALK_DAYS cutoff. Results are sorted newest-first by GHL, so once
+ * a page's most-recent opp is older than the cutoff, the rest are too.
  *
- * Memoized per location for STREAM_TTL_MS. Stop/filter callbacks are
- * intentionally not part of the cache key — the cache only stores the
- * full unfiltered list. Callers that need filtering apply it after the
- * fetch (cheap since opps are already in memory).
+ * Memoized per location for STREAM_TTL_MS so all sections share one fetch.
  */
 export async function streamOpportunities(
   auth: GhlAuth
@@ -73,6 +82,8 @@ export async function streamOpportunities(
   const now = Date.now();
   const cached = streamCache.get(key);
   if (cached && cached.expires > now) return cached.promise;
+
+  const cutoffMs = now - OPP_WALK_DAYS * 24 * 3600 * 1000;
 
   const promise = (async () => {
     const collected: RawOpportunity[] = [];
@@ -86,7 +97,18 @@ export async function streamOpportunities(
       const data: SearchResp = await getV2(auth, url.replace(/^.*?\//, "/"));
       const opps = data.opportunities ?? [];
       if (!opps.length) break;
-      collected.push(...opps);
+      let oldestOnPageMs = Infinity;
+      for (const o of opps) {
+        const ts =
+          (o.lastStageChangeAt && Date.parse(o.lastStageChangeAt)) ||
+          (o.createdAt && Date.parse(o.createdAt)) ||
+          0;
+        if (ts >= cutoffMs) collected.push(o);
+        if (ts < oldestOnPageMs) oldestOnPageMs = ts;
+      }
+      // If every opp on this page is older than the cutoff, GHL is sorted
+      // desc so the remaining pages are also too old -- stop walking.
+      if (oldestOnPageMs < cutoffMs && oldestOnPageMs !== Infinity) break;
       const next = data.meta?.nextPageUrl;
       if (!next) break;
       try {
@@ -100,7 +122,6 @@ export async function streamOpportunities(
   })();
 
   // Cache the promise immediately so concurrent callers share the fetch.
-  // If the fetch rejects, clear the entry so the next call retries.
   streamCache.set(key, { expires: now + STREAM_TTL_MS, promise });
   promise.catch(() => {
     if (streamCache.get(key)?.promise === promise) streamCache.delete(key);
