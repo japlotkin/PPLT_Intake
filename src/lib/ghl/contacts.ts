@@ -1,7 +1,15 @@
 /**
- * Contact / lead pagination. GHL has 21K Abogado + 48K PPLT contacts -- we
- * never want to walk all of them. The dashboard always queries by
- * dateAdded range, which the search endpoint supports natively.
+ * Contact / lead pagination.
+ *
+ * GHL has 21K Abogado + 48K PPLT contacts and the v2 /contacts/search
+ * filter syntax we tried did NOT apply -- every call returned the same
+ * 100 most-recent contacts regardless of date range, which explains the
+ * "100/100 every month" KPI bug.
+ *
+ * Strategy now: walk contacts sorted desc by dateAdded, stop once we
+ * cross a cutoff (default 180 days back so all KPI/Lead/Overview ranges
+ * are covered). Memoize the result per location so all callers share one
+ * walk. Callers filter the in-memory list by their specific window.
  */
 import { postV2, GhlAuth } from "./client";
 
@@ -27,50 +35,83 @@ interface SearchResp {
   searchAfter?: unknown;
 }
 
+const STREAM_TTL_MS = 5 * 60_000;
+const CONTACT_WALK_DAYS = 180;
+
+type StreamCacheEntry = { expires: number; promise: Promise<RawContact[]> };
+const streamCache = new Map<string, StreamCacheEntry>();
+
 /**
- * Returns *all* contacts with dateAdded in [start, end). For dashboard
- * windows this is typically thousands or fewer; pagination handles it.
+ * Walk all contacts created in the last CONTACT_WALK_DAYS, sorted desc.
+ * Memoized per location for ~5 minutes so KPI / Lead / Overview share
+ * one fetch instead of paginating independently.
+ */
+export async function streamContacts(auth: GhlAuth): Promise<RawContact[]> {
+  const key = `contacts:${auth.locationId}`;
+  const now = Date.now();
+  const cached = streamCache.get(key);
+  if (cached && cached.expires > now) return cached.promise;
+
+  const cutoffMs = now - CONTACT_WALK_DAYS * 24 * 3600 * 1000;
+  const pageLimit = 100;
+
+  const promise = (async () => {
+    const out: RawContact[] = [];
+    let searchAfter: unknown = undefined;
+    let page = 0;
+    while (page < 500) {
+      page++;
+      const body: Record<string, unknown> = {
+        locationId: auth.locationId,
+        pageLimit,
+        sort: [{ field: "dateAdded", direction: "desc" }],
+      };
+      if (searchAfter) body.searchAfter = searchAfter;
+      const resp: SearchResp = await postV2(auth, "/contacts/search", body);
+      const got = resp.contacts ?? [];
+      if (got.length === 0) break;
+
+      let oldestOnPageMs = Infinity;
+      for (const c of got) {
+        const t = c.dateAdded ? Date.parse(c.dateAdded) : NaN;
+        if (Number.isNaN(t)) continue;
+        if (t >= cutoffMs) out.push(c);
+        if (t < oldestOnPageMs) oldestOnPageMs = t;
+      }
+      // Stop once the whole page is older than the cutoff.
+      if (oldestOnPageMs < cutoffMs && oldestOnPageMs !== Infinity) break;
+      if (got.length < pageLimit) break;
+      searchAfter = resp.searchAfter;
+      if (!searchAfter) break;
+    }
+    return out;
+  })();
+
+  streamCache.set(key, { expires: now + STREAM_TTL_MS, promise });
+  promise.catch(() => {
+    if (streamCache.get(key)?.promise === promise) streamCache.delete(key);
+  });
+  return promise;
+}
+
+/**
+ * Return contacts whose dateAdded falls in [start, end), filtered from
+ * the memoized streamContacts result. start/end MUST fall within the
+ * CONTACT_WALK_DAYS window (180 days back) -- callers that need older
+ * data should call streamContacts directly and expand the window.
  */
 export async function contactsInRange(
   auth: GhlAuth,
   start: Date,
-  end: Date,
-  pageLimit = 100
+  end: Date
 ): Promise<RawContact[]> {
-  const filters = [
-    {
-      group: "AND",
-      filters: [
-        {
-          field: "dateAdded",
-          operator: "range",
-          value: { gte: start.toISOString(), lt: end.toISOString() },
-        },
-      ],
-    },
-  ];
-
-  const out: RawContact[] = [];
-  let searchAfter: unknown = undefined;
-  let page = 0;
-  while (true) {
-    page++;
-    if (page > 500) break;
-    const body: Record<string, unknown> = {
-      locationId: auth.locationId,
-      pageLimit,
-      sort: [{ field: "dateAdded", direction: "desc" }],
-      filters,
-    };
-    if (searchAfter) body.searchAfter = searchAfter;
-    const resp: SearchResp = await postV2(auth, "/contacts/search", body);
-    const got = resp.contacts ?? [];
-    out.push(...got);
-    if (got.length < pageLimit) break;
-    searchAfter = resp.searchAfter;
-    if (!searchAfter) break;
-  }
-  return out;
+  const all = await streamContacts(auth);
+  const sMs = start.getTime();
+  const eMs = end.getTime();
+  return all.filter((c) => {
+    const t = c.dateAdded ? Date.parse(c.dateAdded) : NaN;
+    return Number.isFinite(t) && t >= sMs && t < eMs;
+  });
 }
 
 /**
@@ -89,6 +130,7 @@ export function normalizeSource(raw: string | undefined | null): string {
   if (r.includes("calculator")) return "Settlement Calculator";
   if (r.includes("organic")) return "Organic";
   if (r.includes("referral") || r.includes("referred")) return "Referral";
+  if (r.includes("prior client")) return "Prior Client";
   if (r.includes("consultation")) return "Consultation Form";
   if (r.includes("chat")) return "Website Chat";
   return raw;

@@ -37,12 +37,20 @@ export interface ReviewWindowCounts {
   perProfile: Array<{ name: string; lifetime: number }>;
 }
 
-/** Returns null when GHL doesn't expose reviews on this plan -- caller surfaces a warning. */
+/**
+ * Returns null when GHL doesn't expose reviews on this plan.
+ *
+ * Single attempt per endpoint with a tight 10s timeout. The reputation
+ * API isn't part of every GHL plan and tends to respond with slow 5xx
+ * errors (not fast 404s), so the default retry policy can burn 60+
+ * seconds per location for no benefit. Reviews are non-critical: if
+ * they don't come back fast, we show "Reviews unavailable" and move on.
+ */
+const REVIEWS_REQ_OPTS = { retries: 0, timeoutMs: 10_000 };
+
 export async function reviewCounts(
   auths: GhlAuth[]
 ): Promise<ReviewWindowCounts | null> {
-  // Each location may expose multiple GBP profiles. Try the documented
-  // reputation endpoint first; bail with null if it 404s on both locations.
   const perProfile: Array<{ name: string; lifetime: number }> = [];
   const now = Date.now();
   const weekAgo = now - 7 * 24 * 3600 * 1000;
@@ -60,7 +68,8 @@ export async function reviewCounts(
       const list = await getV2<{ profiles?: Array<{ id: string; name?: string }> }>(
         auth,
         `/reputation/profiles`,
-        { locationId: auth.locationId }
+        { locationId: auth.locationId },
+        REVIEWS_REQ_OPTS
       );
       const profiles = list.profiles ?? [];
       const wanted = profiles.filter((p) =>
@@ -73,7 +82,8 @@ export async function reviewCounts(
           const resp = await getV2<ReviewListResp>(
             auth,
             `/reputation/profiles/${p.id}/reviews`,
-            { locationId: auth.locationId, limit: 200 }
+            { locationId: auth.locationId, limit: 200 },
+            REVIEWS_REQ_OPTS
           );
           const items = resp.reviews ?? [];
           const lifetimeForP = resp.total ?? items.length;
@@ -88,13 +98,13 @@ export async function reviewCounts(
             if (t >= yearStart) year++;
           }
           anySucceeded = true;
-        } catch (e) {
-          if (!(e instanceof GhlError) || e.status !== 404) continue;
+        } catch {
+          // Plan doesn't expose this profile -- skip and try next.
         }
       }
     } catch (e) {
-      if (e instanceof GhlError && e.status === 404) continue;
-      // other errors: skip silently; data is non-critical
+      if (e instanceof GhlError) continue;
+      // Network error / timeout -- skip silently; data is non-critical
     }
   }
 
