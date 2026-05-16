@@ -172,10 +172,14 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
   ]);
 
   if (overviewData.reviews.lifetime === 0 && overviewData.reviews.perProfile.length === 0) {
-    warnings.push("Google review counts unavailable — GHL reputation endpoint did not return data.");
+    warnings.push(
+      "Google reviews: GHL PIT lacks the Reputation > Read scope. Regenerate the PIT with that scope to populate this section."
+    );
   }
   if (email.length === 0 || email.every((b) => b.sends === 0 && b.opens === 0)) {
-    warnings.push("Email metrics unavailable or zero — GHL email events endpoint did not return data on this plan.");
+    warnings.push(
+      "Email metrics: GHL's public API doesn't expose campaign stats (route returns 'not yet supported by IAM Service'). The emailRX plugin stores its own metrics — wire those separately if needed."
+    );
   }
 
   return {
