@@ -205,9 +205,18 @@ export interface AdCostRow {
   practiceArea: string;
   spend: number;
   leadsMeta: number;
+  /** Cohort: opps with utmAdId=adId AND createdAt in window AND ever reached a signed stage */
   signed: number;
+  /** Cohort: same, but for referred-out/co-counsel pipelines */
+  referred: number;
   cpl: number | null;
   cpsc: number | null;
+  /** Avg (signedAt - createdAt) in days, for the signed cohort */
+  avgDaysToSigned: number | null;
+  /** Avg (referredAt - createdAt) in days, for the referred cohort */
+  avgDaysToReferred: number | null;
+  /** True when the lead-cohort window ends < 60 days ago and signs may still arrive */
+  cohortMaturing: boolean;
 }
 
 export interface PracticeAreaCostRow {
@@ -215,20 +224,27 @@ export interface PracticeAreaCostRow {
   spend: number;
   leadsMeta: number;
   signed: number;
+  referred: number;
   cpl: number | null;
   cpsc: number | null;
+  avgDaysToSigned: number | null;
+  avgDaysToReferred: number | null;
   adCount: number;
+  cohortMaturing: boolean;
 }
 
 export interface AreaStateCostRow {
   area: string;
   state: string;
   spend: number;       // attributed via spend / Meta-leads per ad
-  leads: number;       // GHL opps linked to a Meta ad in window
-  signed: number;      // opps that entered signed stage in window
-  referred: number;    // opps that entered referred-out / co-counsel pipeline in window
+  leads: number;       // GHL opps with utmAdId AND createdAt in window
+  signed: number;      // cohort: same leads that ever reached signed
+  referred: number;    // cohort: same leads that ever reached referred-out / co-counsel
   cpl: number | null;
   cpsc: number | null;
+  avgDaysToSigned: number | null;
+  avgDaysToReferred: number | null;
+  cohortMaturing: boolean;
 }
 
 export interface CostAnalyticsPayload {

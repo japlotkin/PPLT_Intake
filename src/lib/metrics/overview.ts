@@ -11,6 +11,7 @@ import {
   countByStageEntry,
   streamOpportunities,
 } from "../ghl/opportunities";
+import { activePracticePipelines, getLocation } from "../mapping";
 import {
   rangeFor,
   previousPeriod,
@@ -144,8 +145,20 @@ export async function overview(now = new Date()): Promise<OverviewData> {
     new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000)),
   ]);
 
+  // Active cases = open opportunities in in-house active_practice pipelines
+  // ONLY. Excludes co-counsel / referral-broker pipelines (where we've
+  // referred the case OUT) and excludes lead/signed/withdrawn/closed-lost
+  // stages. This matches what people mean when they say 'cases we're
+  // working on right now'.
+  const inHouseAbogadoPipelineIds = new Set(
+    activePracticePipelines(getLocation("abogado")).map((p) => p.id)
+  );
+  const inHousePpltPipelineIds = new Set(
+    activePracticePipelines(getLocation("pplt_leads")).map((p) => p.id)
+  );
   const activeTotal =
-    activeNow(opps.abogado).length + activeNow(opps.pplt).length;
+    activeNow(opps.abogado).filter((o) => inHouseAbogadoPipelineIds.has(o.raw.pipelineId ?? "")).length +
+    activeNow(opps.pplt).filter((o) => inHousePpltPipelineIds.has(o.raw.pipelineId ?? "")).length;
 
   return {
     leads30: delta(leads30Cur, leads30Prev),

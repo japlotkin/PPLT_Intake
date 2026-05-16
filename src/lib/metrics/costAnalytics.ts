@@ -26,31 +26,12 @@ import {
   type ClassifiedOpportunity,
 } from "../ghl/opportunities";
 import { getLocation, practiceAreaLabel } from "../mapping";
-import type { AreaStateCostRow, LocationKey } from "../types";
-
-export interface AdCostRow {
-  adId: string;
-  adName: string;
-  adsetName: string;
-  campaignName: string;
-  account: "pplt" | "workersComp" | "abogado";
-  practiceArea: string;
-  spend: number;
-  leadsMeta: number;
-  signed: number;
-  cpl: number | null;
-  cpsc: number | null;
-}
-
-export interface PracticeAreaCostRow {
-  area: string;
-  spend: number;
-  leadsMeta: number;
-  signed: number;
-  cpl: number | null;
-  cpsc: number | null;
-  adCount: number;
-}
+import type {
+  AdCostRow,
+  AreaStateCostRow,
+  LocationKey,
+  PracticeAreaCostRow,
+} from "../types";
 
 export interface CostAnalytics {
   windowLabel: string;
@@ -170,21 +151,71 @@ export async function costAnalytics(
   const contactStateA = buildContactStateIndex(contactsA, stateFieldIdsFor("abogado"));
   const contactStateP = buildContactStateIndex(contactsP, stateFieldIdsFor("pplt_leads"));
 
-  const signedByAdId = new Map<string, number>();
+  // 3. COHORT ATTRIBUTION: bucket each opp by its createdAt (the day the
+  //    lead came in), not by the day it later signed. A May sign-up from
+  //    an April lead is credited to April spend. Caveats:
+  //    - "Signed" = opp.stageClass is signed AT ANY POINT after createdAt.
+  //      Look-ahead is unlimited inside the 180-day opp walk.
+  //    - "Referred" = opp ended up in a co-counsel-tracking OR
+  //      referral-broker pipeline OR a stage classified as referred_out,
+  //      at any point after createdAt.
+  //    - "cohortMaturing" flags windows that end < 60 days ago, where new
+  //      sign-ups may still arrive.
+  const DAY_MS = 24 * 3600 * 1000;
+  const cohortMaturing = eMs > Date.now() - 60 * DAY_MS;
+
+  interface CohortAgg {
+    signed: number;
+    referred: number;
+    daysToSignedSum: number;
+    daysToSignedCount: number;
+    daysToReferredSum: number;
+    daysToReferredCount: number;
+  }
+  const emptyCohort = (): CohortAgg => ({
+    signed: 0,
+    referred: 0,
+    daysToSignedSum: 0,
+    daysToSignedCount: 0,
+    daysToReferredSum: 0,
+    daysToReferredCount: 0,
+  });
+  const cohortByAdId = new Map<string, CohortAgg>();
+
   for (const o of all) {
     if (!o.includeInMetrics) continue;
-    if (o.stageClass !== "signed") continue;
-    const ts = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
-    if (!Number.isFinite(ts) || ts < sMs || ts >= eMs) continue;
-    for (const adId of adIdsForOpp(o)) {
-      signedByAdId.set(adId, (signedByAdId.get(adId) ?? 0) + 1);
+    const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
+    if (!Number.isFinite(created) || created < sMs || created >= eMs) continue;
+    const adIds = adIdsForOpp(o);
+    if (adIds.length === 0) continue;
+    // Last-touch attribution to avoid double-counting an opp across ads.
+    const adId = adIds[adIds.length - 1];
+    const slot = cohortByAdId.get(adId) ?? emptyCohort();
+
+    const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+    if (Number.isFinite(lastChange) && lastChange >= created) {
+      if (o.stageClass === "signed") {
+        slot.signed += 1;
+        slot.daysToSignedSum += (lastChange - created) / DAY_MS;
+        slot.daysToSignedCount += 1;
+      }
+      if (
+        o.stageClass === "referred_out" ||
+        o.pipelinePurpose === "co_counsel_tracking" ||
+        o.pipelinePurpose === "referral_broker"
+      ) {
+        slot.referred += 1;
+        slot.daysToReferredSum += (lastChange - created) / DAY_MS;
+        slot.daysToReferredCount += 1;
+      }
     }
+    cohortByAdId.set(adId, slot);
   }
 
-  // 3. Build per-ad rows
+  // 4. Build per-ad rows with cohort numbers
   const byAd: AdCostRow[] = adsRaw.map((ad) => {
     const practiceArea = classifyAdPracticeArea(ad);
-    const signed = signedByAdId.get(ad.adId) ?? 0;
+    const cohort = cohortByAdId.get(ad.adId) ?? emptyCohort();
     return {
       adId: ad.adId,
       adName: ad.adName,
@@ -194,21 +225,54 @@ export async function costAnalytics(
       practiceArea,
       spend: ad.spend,
       leadsMeta: ad.leads,
-      signed,
+      signed: cohort.signed,
+      referred: cohort.referred,
       cpl: ad.leads > 0 ? ad.spend / ad.leads : null,
-      cpsc: signed > 0 ? ad.spend / signed : null,
+      cpsc: cohort.signed > 0 ? ad.spend / cohort.signed : null,
+      avgDaysToSigned:
+        cohort.daysToSignedCount > 0
+          ? cohort.daysToSignedSum / cohort.daysToSignedCount
+          : null,
+      avgDaysToReferred:
+        cohort.daysToReferredCount > 0
+          ? cohort.daysToReferredSum / cohort.daysToReferredCount
+          : null,
+      cohortMaturing,
     };
   });
   byAd.sort((a, b) => b.spend - a.spend);
 
-  // 4. Roll up per practice area
-  const paAgg = new Map<string, { spend: number; leads: number; signed: number; adCount: number }>();
+  // 5. Roll up per practice area
+  interface PaAgg {
+    spend: number;
+    leads: number;
+    signed: number;
+    referred: number;
+    adCount: number;
+    dts: number;
+    dtsCount: number;
+    dtr: number;
+    dtrCount: number;
+  }
+  const paAgg = new Map<string, PaAgg>();
   for (const row of byAd) {
-    const slot = paAgg.get(row.practiceArea) ?? { spend: 0, leads: 0, signed: 0, adCount: 0 };
+    const slot = paAgg.get(row.practiceArea) ?? {
+      spend: 0, leads: 0, signed: 0, referred: 0, adCount: 0,
+      dts: 0, dtsCount: 0, dtr: 0, dtrCount: 0,
+    };
     slot.spend += row.spend;
     slot.leads += row.leadsMeta;
     slot.signed += row.signed;
+    slot.referred += row.referred;
     slot.adCount += 1;
+    if (row.avgDaysToSigned !== null && row.signed > 0) {
+      slot.dts += row.avgDaysToSigned * row.signed;
+      slot.dtsCount += row.signed;
+    }
+    if (row.avgDaysToReferred !== null && row.referred > 0) {
+      slot.dtr += row.avgDaysToReferred * row.referred;
+      slot.dtrCount += row.referred;
+    }
     paAgg.set(row.practiceArea, slot);
   }
   const byPracticeArea: PracticeAreaCostRow[] = Array.from(paAgg.entries())
@@ -217,9 +281,13 @@ export async function costAnalytics(
       spend: v.spend,
       leadsMeta: v.leads,
       signed: v.signed,
+      referred: v.referred,
       cpl: v.leads > 0 ? v.spend / v.leads : null,
       cpsc: v.signed > 0 ? v.spend / v.signed : null,
+      avgDaysToSigned: v.dtsCount > 0 ? v.dts / v.dtsCount : null,
+      avgDaysToReferred: v.dtrCount > 0 ? v.dtr / v.dtrCount : null,
       adCount: v.adCount,
+      cohortMaturing,
     }))
     .sort((a, b) => b.spend - a.spend);
 
@@ -230,17 +298,26 @@ export async function costAnalytics(
   const adById = new Map<string, AdCostRow>();
   for (const r of byAd) adById.set(r.adId, r);
 
-  const byAreaStateMap = new Map<
-    string,
-    { area: string; state: string; spend: number; leads: number; signed: number; referred: number }
-  >();
+  interface AreaStateAgg {
+    area: string;
+    state: string;
+    spend: number;
+    leads: number;
+    signed: number;
+    referred: number;
+    dts: number;
+    dtsCount: number;
+    dtr: number;
+    dtrCount: number;
+  }
+  const byAreaStateMap = new Map<string, AreaStateAgg>();
   for (const o of all) {
     if (!o.includeInMetrics) continue;
+    // Cohort: lead must have come in during the window.
+    const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
+    if (!Number.isFinite(created) || created < sMs || created >= eMs) continue;
     const adIds = adIdsForOpp(o);
     if (adIds.length === 0) continue;
-    // Use the LAST attribution's adId for bucket assignment (avoids double-
-    // counting an opp into multiple area/state buckets when it has both
-    // first-touch and last-touch attributions).
     const adId = adIds[adIds.length - 1];
     const ad = adById.get(adId);
     if (!ad || ad.leadsMeta === 0) continue;
@@ -254,23 +331,31 @@ export async function costAnalytics(
     const key = `${areaKey}|||${state}`;
     let slot = byAreaStateMap.get(key);
     if (!slot) {
-      slot = { area: areaKey, state, spend: 0, leads: 0, signed: 0, referred: 0 };
+      slot = {
+        area: areaKey, state, spend: 0, leads: 0, signed: 0, referred: 0,
+        dts: 0, dtsCount: 0, dtr: 0, dtrCount: 0,
+      };
       byAreaStateMap.set(key, slot);
     }
-    // Count this opp's contribution.
     slot.leads += 1;
     slot.spend += costPerLead;
 
-    const tsLast = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
-    const inWindow = Number.isFinite(tsLast) && tsLast >= sMs && tsLast < eMs;
-    if (inWindow && o.stageClass === "signed") slot.signed += 1;
-    if (
-      inWindow &&
-      (o.stageClass === "referred_out" ||
+    const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+    if (Number.isFinite(lastChange) && lastChange >= created) {
+      if (o.stageClass === "signed") {
+        slot.signed += 1;
+        slot.dts += (lastChange - created) / DAY_MS;
+        slot.dtsCount += 1;
+      }
+      if (
+        o.stageClass === "referred_out" ||
         o.pipelinePurpose === "co_counsel_tracking" ||
-        o.pipelinePurpose === "referral_broker")
-    ) {
-      slot.referred += 1;
+        o.pipelinePurpose === "referral_broker"
+      ) {
+        slot.referred += 1;
+        slot.dtr += (lastChange - created) / DAY_MS;
+        slot.dtrCount += 1;
+      }
     }
   }
 
@@ -284,6 +369,9 @@ export async function costAnalytics(
       referred: r.referred,
       cpl: r.leads > 0 ? r.spend / r.leads : null,
       cpsc: r.signed > 0 ? r.spend / r.signed : null,
+      avgDaysToSigned: r.dtsCount > 0 ? r.dts / r.dtsCount : null,
+      avgDaysToReferred: r.dtrCount > 0 ? r.dtr / r.dtrCount : null,
+      cohortMaturing,
     }))
     .sort((a, b) => b.spend - a.spend);
 
