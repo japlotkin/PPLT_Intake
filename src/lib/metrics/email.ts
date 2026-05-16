@@ -14,6 +14,13 @@ import {
 } from "../ghl/opportunities";
 import type { EmailMetrics } from "../types";
 
+// GHL email endpoints (/emails/stats and /emails/events) consistently
+// return slow 5xx on this plan tier, eating the 120s section timeout.
+// Set this to true once we identify the right endpoint or upgrade the
+// GHL plan; until then we return empty metrics and the dashboard shows
+// "Email metrics unavailable" warning.
+const FETCH_EMAIL = false;
+
 interface ReplyEvent {
   contactId: string;
   ts: number;
@@ -54,6 +61,12 @@ export async function emailMetricsByBucket(
   start: Date,
   end: Date
 ): Promise<EmailMetrics[]> {
+  if (!FETCH_EMAIL) {
+    return [
+      { bucket: "spanish", sends: 0, opens: 0, clicks: 0, replies: 0, unsubscribes: 0, signedWithin30dOfReply: 0 },
+      { bucket: "english", sends: 0, opens: 0, clicks: 0, replies: 0, unsubscribes: 0, signedWithin30dOfReply: 0 },
+    ];
+  }
   const authA = authAbogado();
   const authP = authPplt();
   const [esRaw, enRaw] = await Promise.all([
