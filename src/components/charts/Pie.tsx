@@ -4,16 +4,16 @@ import { Cell, Pie as RPie, PieChart, ResponsiveContainer, Tooltip, Legend } fro
 import { EmptyState } from "../EmptyState";
 
 const COLORS = [
-  "#d97706",
+  "#2563eb",
   "#0ea5e9",
+  "#7c3aed",
   "#10b981",
-  "#a855f7",
-  "#f43f5e",
-  "#facc15",
-  "#22d3ee",
-  "#84cc16",
+  "#f59e0b",
+  "#ec4899",
+  "#06b6d4",
+  "#8b5cf6",
   "#64748b",
-  "#fb923c",
+  "#14b8a6",
 ];
 
 export function Pie({
@@ -30,19 +30,23 @@ export function Pie({
         <PieChart>
           <Tooltip
             contentStyle={{
-              borderRadius: 8,
-              border: "1px solid #e5e5e5",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
               fontSize: 12,
+              boxShadow: "0 1px 2px rgba(15,23,42,0.06)",
             }}
+            labelStyle={{ color: "#0f172a", fontWeight: 600 }}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
           <RPie
             data={data}
             dataKey="value"
             nameKey="name"
-            innerRadius={50}
-            outerRadius={90}
+            innerRadius={55}
+            outerRadius={95}
             paddingAngle={2}
+            stroke="#fff"
+            strokeWidth={2}
           >
             {data.map((_, i) => (
               <Cell key={i} fill={COLORS[i % COLORS.length]} />
