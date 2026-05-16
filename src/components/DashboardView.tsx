@@ -24,12 +24,16 @@ import { StatCard } from "@/components/StatCard";
 import { BarCount } from "@/components/charts/BarCount";
 import { Pie } from "@/components/charts/Pie";
 import { SortHeader, useSortable } from "@/components/sortable";
+import { BucketSwitcher, type Bucket } from "@/components/BucketSwitcher";
+import { UserButton } from "@clerk/nextjs";
+import { Shield, RefreshCcw as RefreshIcon, FileDown } from "lucide-react";
 import type { Preset } from "@/lib/dateRanges";
 import type {
   AdCostRow,
   AreaStateCostRow,
   DashboardData,
   IntakeMemberMetrics,
+  KpiBlock,
   PracticeAreaCostRow,
 } from "@/lib/types";
 
@@ -38,10 +42,21 @@ interface DashboardViewProps {
   endpoint?: string;
   /** Optional refresh endpoint; if null, the Refresh button just re-fetches. */
   refreshEndpoint?: string | null;
-  /** Right-side header slot (e.g. Clerk's <UserButton/>). */
+  /** Right-side header slot (overrides built-in Clerk UserButton w/ admin menu). */
   headerRight?: ReactNode;
   /** Show a "DEMO" pill in the header. */
   demoBadge?: boolean;
+}
+
+/** Hidden form for the historical-KPI CSV export.
+ *  Submitting a hidden link triggers the file download via the browser. */
+function downloadHistoricalKpi(months: number) {
+  const a = document.createElement("a");
+  a.href = `/api/admin/kpi-history?months=${months}`;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function todayISO() {
@@ -97,37 +112,73 @@ function isSubVisible(
 
 function SectionNav({
   visibility,
-  isAdmin,
+  bucket,
+  onBucketChange,
 }: {
   visibility: DashboardData["visibility"];
-  isAdmin: boolean;
+  bucket: Bucket;
+  onBucketChange: (b: Bucket) => void;
 }) {
   const visible = SECTIONS.filter((s) => isVisible(visibility, s.id));
   return (
-    <aside className="hidden lg:block w-48 shrink-0">
-      <div className="sticky top-24 space-y-0.5">
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 pb-2">
-          Sections
+    <aside className="hidden lg:block w-56 shrink-0">
+      <div className="sticky top-24 space-y-4">
+        <BucketSwitcher value={bucket} onChange={onBucketChange} />
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 pb-2">
+            Sections
+          </div>
+          {visible.map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="block px-3 py-1.5 rounded-md text-sm text-slate-600 hover:text-blue-700 hover:bg-blue-50/60 transition-colors"
+            >
+              {s.label}
+            </a>
+          ))}
         </div>
-        {visible.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            className="block px-3 py-1.5 rounded-md text-sm text-slate-600 hover:text-blue-700 hover:bg-blue-50/60 transition-colors"
-          >
-            {s.label}
-          </a>
-        ))}
-        {isAdmin && (
-          <a
-            href="/admin"
-            className="block mt-4 px-3 py-1.5 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-50/60 transition-colors border-t border-slate-100 pt-3"
-          >
-            Admin →
-          </a>
-        )}
       </div>
     </aside>
+  );
+}
+
+function AdminUserMenu({
+  isAdmin,
+  onRefresh,
+  refreshing,
+}: {
+  isAdmin: boolean;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  return (
+    <UserButton>
+      {isAdmin && (
+        <UserButton.MenuItems>
+          <UserButton.Link
+            label="Section visibility"
+            labelIcon={<Shield className="h-4 w-4" />}
+            href="/admin"
+          />
+          <UserButton.Action
+            label={refreshing ? "Syncing…" : "Refresh data now"}
+            labelIcon={<RefreshIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />}
+            onClick={onRefresh}
+          />
+          <UserButton.Action
+            label="Export 12-month KPI history"
+            labelIcon={<FileDown className="h-4 w-4" />}
+            onClick={() => downloadHistoricalKpi(12)}
+          />
+          <UserButton.Action
+            label="Export 24-month KPI history"
+            labelIcon={<FileDown className="h-4 w-4" />}
+            onClick={() => downloadHistoricalKpi(24)}
+          />
+        </UserButton.MenuItems>
+      )}
+    </UserButton>
   );
 }
 
@@ -179,6 +230,7 @@ export default function DashboardView({
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [bucket, setBucket] = useState<Bucket>("combined");
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ preset });
@@ -273,21 +325,23 @@ export default function DashboardView({
                 setEndISO(e);
               }}
             />
-            <button
-              onClick={refresh}
-              disabled={refreshing || loading}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
-            >
-              <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
-            {headerRight}
+            {headerRight ?? (
+              <AdminUserMenu
+                isAdmin={data?.visibility?.isAdmin ?? false}
+                onRefresh={refresh}
+                refreshing={refreshing}
+              />
+            )}
           </div>
         </div>
       </header>
 
       <div className="max-w-[1400px] mx-auto px-6 py-8 flex gap-8">
-        <SectionNav visibility={data?.visibility} isAdmin={data?.visibility?.isAdmin ?? false} />
+        <SectionNav
+          visibility={data?.visibility}
+          bucket={bucket}
+          onBucketChange={setBucket}
+        />
         <main className="flex-1 min-w-0 space-y-10">
         {loading && !data && !needsSync && (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center space-y-2">
@@ -350,11 +404,11 @@ export default function DashboardView({
         {data && (
           <>
             {isVisible(data.visibility, "overview") && <Overview data={data} />}
-            {isVisible(data.visibility, "kpi") && <Kpi data={data} />}
-            {isVisible(data.visibility, "cost") && <CostBlock data={data} />}
-            {isVisible(data.visibility, "leads") && <LeadsBlock data={data} />}
-            {isVisible(data.visibility, "intake") && <IntakeTeamBlock data={data} />}
-            {isVisible(data.visibility, "cases") && <CasesBlock data={data} />}
+            {isVisible(data.visibility, "kpi") && <Kpi data={data} bucket={bucket} />}
+            {isVisible(data.visibility, "cost") && <CostBlock data={data} bucket={bucket} />}
+            {isVisible(data.visibility, "leads") && <LeadsBlock data={data} bucket={bucket} />}
+            {isVisible(data.visibility, "intake") && <IntakeTeamBlock data={data} bucket={bucket} />}
+            {isVisible(data.visibility, "cases") && <CasesBlock data={data} bucket={bucket} />}
             <p className="text-[11px] text-slate-400 text-center pt-8">
               {data.syncedAt ? (
                 <>
@@ -435,83 +489,28 @@ export default function DashboardView({
     );
   }
 
-  function Kpi({ data }: { data: DashboardData }) {
+  function Kpi({ data, bucket }: { data: DashboardData; bucket: Bucket }) {
     const showMonths = isSubVisible(data.visibility, "kpi", "by_month");
     const showQuarters = isSubVisible(data.visibility, "kpi", "by_quarter");
-    const isAdmin = data.visibility?.isAdmin ?? false;
-    const [historyMonths, setHistoryMonths] = useState(12);
-    const [historyLoading, setHistoryLoading] = useState(false);
-
-    async function exportHistorical() {
-      setHistoryLoading(true);
-      try {
-        const res = await fetch(`/api/admin/kpi-history?months=${historyMonths}`);
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          alert(j.error ?? `Export failed: ${res.status}`);
-          return;
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `kpi-history-${historyMonths}mo.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } finally {
-        setHistoryLoading(false);
-      }
-    }
+    // Filter KPI blocks to show only the matching bucket column when set.
+    const filterBlock = (block: KpiBlock): KpiBlock => {
+      if (bucket === "combined") return block;
+      return {
+        ...block,
+        rows: block.rows.map((r) => ({
+          ...r,
+          spanish: bucket === "spanish" ? r.spanish : "—",
+          english: bucket === "english" ? r.english : "—",
+        })),
+      };
+    };
 
     return (
       <section id="kpi">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">
-              KPIs
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Spanish vs English · current + previous month, current + last quarter
-            </p>
-          </div>
-          {isAdmin && (
-            <div className="flex items-center gap-2">
-              <select
-                value={historyMonths}
-                onChange={(e) => setHistoryMonths(Number(e.target.value))}
-                disabled={historyLoading}
-                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700"
-              >
-                <option value={6}>Last 6 months</option>
-                <option value={12}>Last 12 months</option>
-                <option value={18}>Last 18 months</option>
-                <option value={24}>Last 24 months</option>
-                <option value={36}>Last 36 months</option>
-              </select>
-              <button
-                type="button"
-                onClick={exportHistorical}
-                disabled={historyLoading}
-                title="Walks contacts + opps back the chosen number of months; can take 60-120s"
-                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50 transition disabled:opacity-50"
-              >
-                {historyLoading ? (
-                  <>
-                    <span className="inline-block h-3 w-3 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" />
-                    Exporting…
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-3.5 w-3.5" />
-                    Export historical CSV
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
+        <SectionHeader
+          title="KPIs"
+          subtitle="Spanish vs English · current + previous month, current + last quarter"
+        />
         <div className="space-y-6">
           {showMonths && (
             <div>
@@ -520,7 +519,7 @@ export default function DashboardView({
               </h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {data.kpi.months.map((b) => (
-                  <KpiTable key={b.title} block={b} />
+                  <KpiTable key={b.title} block={filterBlock(b)} />
                 ))}
               </div>
             </div>
@@ -532,7 +531,7 @@ export default function DashboardView({
               </h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {data.kpi.quarters.map((b) => (
-                  <KpiTable key={b.title} block={b} />
+                  <KpiTable key={b.title} block={filterBlock(b)} />
                 ))}
               </div>
             </div>
@@ -546,9 +545,54 @@ export default function DashboardView({
   // email campaign stats, and the Reputation endpoint needs a PIT scope
   // we don't have. Will revisit once we have a real data source.
 
-  function CostBlock({ data }: { data: DashboardData }) {
-    const c = data.cost;
-    if (!c) return null;
+  function CostBlock({ data, bucket }: { data: DashboardData; bucket: Bucket }) {
+    const rawCost = data.cost;
+    if (!rawCost) return null;
+    // Filter ads + practice areas + area×state by ad.account so the totals
+    // recompute consistently for English (pplt + workersComp) vs Spanish
+    // (abogado). Combined keeps everything.
+    const c = useMemo(() => {
+      if (bucket === "combined") return rawCost;
+      const matchAccount = (acct: string) =>
+        bucket === "spanish" ? acct === "abogado" : acct !== "abogado";
+      const byAd = rawCost.byAd.filter((r) => matchAccount(r.account));
+      const totalSpend = byAd.reduce((s, r) => s + r.spend, 0);
+      const totalLeadsMeta = byAd.reduce((s, r) => s + r.leadsMeta, 0);
+      const totalSigned = byAd.reduce((s, r) => s + r.signed, 0);
+      // Re-aggregate by practice area from the filtered ads.
+      const paMap = new Map<string, { area: string; spend: number; leadsMeta: number; signed: number; adCount: number }>();
+      for (const ad of byAd) {
+        const key = ad.practiceArea === "unknown" ? "Unclassified" : ad.practiceArea;
+        const slot = paMap.get(key) ?? { area: key, spend: 0, leadsMeta: 0, signed: 0, adCount: 0 };
+        slot.spend += ad.spend;
+        slot.leadsMeta += ad.leadsMeta;
+        slot.signed += ad.signed;
+        slot.adCount += 1;
+        paMap.set(key, slot);
+      }
+      const byPracticeArea = Array.from(paMap.values())
+        .map((r) => ({
+          ...r,
+          cpl: r.leadsMeta > 0 ? r.spend / r.leadsMeta : null,
+          cpsc: r.signed > 0 ? r.spend / r.signed : null,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+      // byAreaState rows don't carry an account, so we can't filter them
+      // cleanly. Hide the table entirely under English/Spanish; user can
+      // switch to Combined to see it.
+      const byAreaState: typeof rawCost.byAreaState = [];
+      return {
+        ...rawCost,
+        totalSpend,
+        totalLeadsMeta,
+        totalSigned,
+        totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
+        totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
+        byAd,
+        byPracticeArea,
+        byAreaState,
+      };
+    }, [rawCost, bucket]);
     const fmtUsd = (n: number) =>
       `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
     const fmtUsd2 = (n: number | null) =>
@@ -887,11 +931,15 @@ export default function DashboardView({
     );
   }
 
-  function LeadsBlock({ data }: { data: DashboardData }) {
-    const showEnSrc = isSubVisible(data.visibility, "leads", "english_sources");
-    const showEsSrc = isSubVisible(data.visibility, "leads", "spanish_sources");
-    const showEnStatus = isSubVisible(data.visibility, "leads", "english_status");
-    const showEsStatus = isSubVisible(data.visibility, "leads", "spanish_status");
+  function LeadsBlock({ data, bucket }: { data: DashboardData; bucket: Bucket }) {
+    const showEnSrc =
+      isSubVisible(data.visibility, "leads", "english_sources") && bucket !== "spanish";
+    const showEsSrc =
+      isSubVisible(data.visibility, "leads", "spanish_sources") && bucket !== "english";
+    const showEnStatus =
+      isSubVisible(data.visibility, "leads", "english_status") && bucket !== "spanish";
+    const showEsStatus =
+      isSubVisible(data.visibility, "leads", "spanish_status") && bucket !== "english";
     return (
       <section id="leads">
         <SectionHeader
@@ -988,43 +1036,19 @@ export default function DashboardView({
     );
   }
 
-  function IntakeTeamBlock({ data }: { data: DashboardData }) {
-    const [bucket, setBucket] = useState<"combined" | "english" | "spanish">("combined");
+  function IntakeTeamBlock({ data, bucket }: { data: DashboardData; bucket: Bucket }) {
     const rows =
       bucket === "english"
         ? data.intakeTeamEnglish ?? data.intakeTeam ?? []
         : bucket === "spanish"
           ? data.intakeTeamSpanish ?? data.intakeTeam ?? []
           : data.intakeTeam ?? [];
-    const tabs: Array<{ id: typeof bucket; label: string; sub: string }> = [
-      { id: "combined", label: "Combined", sub: "English + Spanish" },
-      { id: "english", label: "English", sub: "PPLT" },
-      { id: "spanish", label: "Spanish", sub: "Abogado" },
-    ];
     return (
       <section id="intake">
         <SectionHeader
           title="Intake Team"
           subtitle="Per-member referrals, calls, SMS, and trends · click any column to sort"
         />
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 mb-4">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setBucket(t.id)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                bucket === t.id
-                  ? "bg-blue-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {t.label}
-              <span className={`ml-1.5 text-[10px] uppercase tracking-wider ${bucket === t.id ? "text-blue-100" : "text-slate-400"}`}>
-                {t.sub}
-              </span>
-            </button>
-          ))}
-        </div>
         <IntakeTeamTable rows={rows} />
       </section>
     );
@@ -1137,20 +1161,7 @@ export default function DashboardView({
     );
   }
 
-  function CasesBlock({ data }: { data: DashboardData }) {
-    return (
-      <section id="cases">
-        <SectionHeader
-          title="Case Analytics"
-          subtitle="Snapshot of active cases (not date-filtered)"
-        />
-        <CasesTabs data={data} />
-      </section>
-    );
-  }
-
-  function CasesTabs({ data }: { data: DashboardData }) {
-    const [bucket, setBucket] = useState<"combined" | "english" | "spanish">("combined");
+  function CasesBlock({ data, bucket }: { data: DashboardData; bucket: Bucket }) {
     const view =
       bucket === "english"
         ? data.casesEnglish ?? data.cases
@@ -1158,31 +1169,12 @@ export default function DashboardView({
           ? data.casesSpanish ?? data.cases
           : data.cases;
     const brokers = view.referralBrokers;
-    const tabs: Array<{ id: typeof bucket; label: string; sub: string }> = [
-      { id: "combined", label: "Combined", sub: "English + Spanish" },
-      { id: "english", label: "English", sub: "PPLT" },
-      { id: "spanish", label: "Spanish", sub: "Abogado" },
-    ];
     return (
-      <>
-        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 mb-4">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setBucket(t.id)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                bucket === t.id
-                  ? "bg-blue-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {t.label}
-              <span className={`ml-1.5 text-[10px] uppercase tracking-wider ${bucket === t.id ? "text-blue-100" : "text-slate-400"}`}>
-                {t.sub}
-              </span>
-            </button>
-          ))}
-        </div>
+      <section id="cases">
+        <SectionHeader
+          title="Case Analytics"
+          subtitle="Snapshot of active cases (not date-filtered)"
+        />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {isSubVisible(data.visibility, "cases", "by_practice_area") && (
             <ChartCard title="By Practice Area">
@@ -1229,7 +1221,7 @@ export default function DashboardView({
           </ChartCard>
           )}
         </div>
-      </>
+      </section>
     );
   }
 

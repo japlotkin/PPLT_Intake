@@ -1,4 +1,3 @@
-import { UserButton } from "@clerk/nextjs";
 import DashboardView from "@/components/DashboardView";
 
 export default function DashboardPage() {
@@ -6,7 +5,6 @@ export default function DashboardPage() {
     <DashboardView
       endpoint="/api/data"
       refreshEndpoint="/api/refresh"
-      headerRight={<UserButton />}
     />
   );
 }
