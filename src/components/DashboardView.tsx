@@ -25,6 +25,7 @@ import { SortHeader, useSortable } from "@/components/sortable";
 import type { Preset } from "@/lib/dateRanges";
 import type {
   AdCostRow,
+  AreaStateCostRow,
   DashboardData,
   IntakeMemberMetrics,
   PracticeAreaCostRow,
@@ -463,12 +464,78 @@ export default function DashboardView({
         </div>
 
         <div className="mt-6">
+          <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3 flex items-center gap-2">
+            By Area × State
+            <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">
+              · state from contact's State (Jurisdiction); spend attributed via $/Meta-lead
+            </span>
+          </h3>
+          <AreaStateCostTable rows={c.byAreaState ?? []} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
+        </div>
+
+        <div className="mt-6">
           <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
             Per Ad · top 40 by spend
           </h3>
           <AdCostTable rows={c.byAd.slice(0, 40)} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
       </section>
+    );
+  }
+
+  function AreaStateCostTable({
+    rows,
+    fmtUsd,
+    fmtUsd2,
+  }: {
+    rows: AreaStateCostRow[];
+    fmtUsd: (n: number) => string;
+    fmtUsd2: (n: number | null) => string;
+  }) {
+    type Col = "area" | "state" | "cpl" | "cpsc" | "spend" | "leads" | "signed" | "referred";
+    const { sorted, sortKey, sortDir, onSort } = useSortable<AreaStateCostRow, Col>(
+      rows,
+      "spend",
+      "desc",
+      (r, k) => r[k] as string | number | null
+    );
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[900px]">
+          <thead className="bg-slate-50/60">
+            <tr className="border-b border-slate-200">
+              <SortHeader label="Area" columnKey="area" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" className="px-5" />
+              <SortHeader label="State" columnKey="state" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" className="px-5" />
+              <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Spend" columnKey="spend" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Leads" columnKey="leads" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Referred" columnKey="referred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-5 py-6 text-center text-slate-400 text-sm">
+                  No (area × state) buckets in this window. Most likely the contacts coming from these ads don&apos;t have State (Jurisdiction) populated.
+                </td>
+              </tr>
+            ) : sorted.map((r, i) => (
+              <tr key={`${r.area}-${r.state}-${i}`} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
+                <td className="px-5 py-2.5 font-medium text-slate-800">{r.area}</td>
+                <td className="px-5 py-2.5 text-slate-700">{r.state}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd(r.spend)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{r.leads.toLocaleString()}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{r.signed.toLocaleString()}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums">{r.referred.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 

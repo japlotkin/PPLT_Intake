@@ -173,6 +173,7 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
         totalCpsc: null,
         byAd: [],
         byPracticeArea: [],
+        byAreaState: [],
       },
       warnings,
       SECTION_TIMEOUT_MS,

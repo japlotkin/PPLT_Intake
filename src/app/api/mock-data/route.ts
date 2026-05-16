@@ -174,6 +174,16 @@ const fixture: DashboardData = {
       { adId: "1004", adName: "Abogado MVA - Spanish testimonial", campaignName: "AA MVA", adsetName: "MD Latino", account: "abogado", practiceArea: "auto", spend: 824, leadsMeta: 22, signed: 2, cpl: 37.45, cpsc: 412.0 },
       { adId: "1005", adName: "HRMT lead form", campaignName: "PPLT HRMT", adsetName: "Women 35-65", account: "pplt", practiceArea: "mass_tort_hair_relaxer", spend: 612, leadsMeta: 14, signed: 1, cpl: 43.71, cpsc: 612.0 },
     ],
+    byAreaState: [
+      { area: "Auto", state: "MD", spend: 7842, leads: 192, signed: 14, referred: 2, cpl: 40.84, cpsc: 560.14 },
+      { area: "Workers' Comp", state: "MD", spend: 3920, leads: 78, signed: 7, referred: 1, cpl: 50.26, cpsc: 560.0 },
+      { area: "Dog Bite", state: "MD", spend: 2410, leads: 64, signed: 4, referred: 0, cpl: 37.66, cpsc: 602.5 },
+      { area: "Auto", state: "DC", spend: 1198, leads: 28, signed: 2, referred: 0, cpl: 42.79, cpsc: 599.0 },
+      { area: "Mass Tort: Hair Relaxer", state: "MD", spend: 1841, leads: 41, signed: 3, referred: 0, cpl: 44.9, cpsc: 613.67 },
+      { area: "Auto", state: "VA", spend: 802, leads: 18, signed: 1, referred: 1, cpl: 44.56, cpsc: 802.0 },
+      { area: "Workers' Comp", state: "DC", spend: 614, leads: 11, signed: 1, referred: 0, cpl: 55.82, cpsc: 614.0 },
+      { area: "Auto", state: "Unknown", spend: 942, leads: 24, signed: 1, referred: 0, cpl: 39.25, cpsc: 942.0 },
+    ],
   },
   warnings: [
     "DEMO MODE — these numbers are hand-crafted fixtures so you can preview the UI without waiting for the GHL/Meta cold-cache load. Add ?demo=0 (or just visit /dashboard normally) for real data.",

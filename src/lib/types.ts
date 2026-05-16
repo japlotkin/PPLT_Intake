@@ -220,6 +220,17 @@ export interface PracticeAreaCostRow {
   adCount: number;
 }
 
+export interface AreaStateCostRow {
+  area: string;
+  state: string;
+  spend: number;       // attributed via spend / Meta-leads per ad
+  leads: number;       // GHL opps linked to a Meta ad in window
+  signed: number;      // opps that entered signed stage in window
+  referred: number;    // opps that entered referred-out / co-counsel pipeline in window
+  cpl: number | null;
+  cpsc: number | null;
+}
+
 export interface CostAnalyticsPayload {
   windowLabel: string;
   totalSpend: number;
@@ -229,6 +240,7 @@ export interface CostAnalyticsPayload {
   totalCpsc: number | null;
   byAd: AdCostRow[];
   byPracticeArea: PracticeAreaCostRow[];
+  byAreaState: AreaStateCostRow[];
 }
 
 // ----- top-level payload -----

@@ -19,12 +19,14 @@
  */
 import { allAdInsights, type MetaAdRow } from "../meta/ads";
 import { authAbogado, authPplt } from "../ghl/client";
+import { streamContacts } from "../ghl/contacts";
 import {
   classifyOpportunities,
   streamOpportunities,
   type ClassifiedOpportunity,
 } from "../ghl/opportunities";
-import { practiceAreaLabel } from "../mapping";
+import { getLocation, practiceAreaLabel } from "../mapping";
+import type { AreaStateCostRow, LocationKey } from "../types";
 
 export interface AdCostRow {
   adId: string;
@@ -59,9 +61,49 @@ export interface CostAnalytics {
   totalSigned: number;
   totalCpl: number | null;
   totalCpsc: number | null;
-  byAd: AdCostRow[];      // sorted by spend desc
+  byAd: AdCostRow[];                     // sorted by spend desc
   byPracticeArea: PracticeAreaCostRow[]; // sorted by spend desc
+  byAreaState: AreaStateCostRow[];       // sorted by spend desc
   warnings: string[];
+}
+
+function stateFieldIdsFor(key: LocationKey): string[] {
+  const loc = getLocation(key);
+  const stateFields = loc.custom_fields.filter((c) => c.kind === "state");
+  return stateFields
+    .map((f, i) => ({ f, priority: /jurisdiction/i.test(f.name) ? 0 : 1, originalIndex: i }))
+    .sort((a, b) => a.priority - b.priority || a.originalIndex - b.originalIndex)
+    .map((r) => r.f.id);
+}
+
+function buildContactStateIndex(
+  contacts: Array<{
+    id: string;
+    state?: string;
+    customFields?: Array<{ id: string; value?: unknown }>;
+  }>,
+  stateFieldIds: string[]
+): Map<string, string> {
+  const idx = new Map<string, string>();
+  for (const c of contacts) {
+    let chosen: string | null = null;
+    const cfList = c.customFields ?? [];
+    if (cfList.length > 0) {
+      const cfMap = new Map(cfList.map((cf) => [cf.id, cf.value]));
+      for (const id of stateFieldIds) {
+        const v = cfMap.get(id);
+        if (typeof v === "string" && v.trim()) {
+          chosen = v.trim().toUpperCase();
+          break;
+        }
+      }
+    }
+    if (!chosen && typeof c.state === "string" && c.state.trim()) {
+      chosen = c.state.trim().toUpperCase();
+    }
+    if (chosen) idx.set(c.id, chosen);
+  }
+  return idx;
 }
 
 /**
@@ -112,15 +154,21 @@ export async function costAnalytics(
   }
 
   // 2. GHL signed-in-window, indexed by utmAdId
+  //    Plus contact-state index for the (area, state) rollup.
   const authA = authAbogado();
   const authP = authPplt();
-  const [oppsA, oppsP] = await Promise.all([
+  const [oppsA, oppsP, contactsA, contactsP] = await Promise.all([
     streamOpportunities(authA).then((r) => classifyOpportunities(authA, r)),
     streamOpportunities(authP).then((r) => classifyOpportunities(authP, r)),
+    streamContacts(authA),
+    streamContacts(authP),
   ]);
   const all = [...oppsA, ...oppsP];
   const sMs = start.getTime();
   const eMs = end.getTime();
+
+  const contactStateA = buildContactStateIndex(contactsA, stateFieldIdsFor("abogado"));
+  const contactStateP = buildContactStateIndex(contactsP, stateFieldIdsFor("pplt_leads"));
 
   const signedByAdId = new Map<string, number>();
   for (const o of all) {
@@ -175,7 +223,71 @@ export async function costAnalytics(
     }))
     .sort((a, b) => b.spend - a.spend);
 
-  // 5. Totals
+  // 5. By (Area, State) — attribute each opp's share of its source ad's
+  //    spend (spend / Meta-leads). Walks opps in window with a utmAdId,
+  //    joins to the ad to derive area + cost-per-lead, joins to contact
+  //    for state.
+  const adById = new Map<string, AdCostRow>();
+  for (const r of byAd) adById.set(r.adId, r);
+
+  const byAreaStateMap = new Map<
+    string,
+    { area: string; state: string; spend: number; leads: number; signed: number; referred: number }
+  >();
+  for (const o of all) {
+    if (!o.includeInMetrics) continue;
+    const adIds = adIdsForOpp(o);
+    if (adIds.length === 0) continue;
+    // Use the LAST attribution's adId for bucket assignment (avoids double-
+    // counting an opp into multiple area/state buckets when it has both
+    // first-touch and last-touch attributions).
+    const adId = adIds[adIds.length - 1];
+    const ad = adById.get(adId);
+    if (!ad || ad.leadsMeta === 0) continue;
+    const costPerLead = ad.spend / ad.leadsMeta;
+    const stateIdx = o.locationKey === "abogado" ? contactStateA : contactStateP;
+    const state =
+      (o.raw.contactId && stateIdx.get(o.raw.contactId)) ||
+      (typeof o.raw.contact?.state === "string" ? o.raw.contact.state.trim().toUpperCase() : null) ||
+      "Unknown";
+    const areaKey = ad.practiceArea === "unknown" ? "Unclassified" : practiceAreaLabel(ad.practiceArea);
+    const key = `${areaKey}|||${state}`;
+    let slot = byAreaStateMap.get(key);
+    if (!slot) {
+      slot = { area: areaKey, state, spend: 0, leads: 0, signed: 0, referred: 0 };
+      byAreaStateMap.set(key, slot);
+    }
+    // Count this opp's contribution.
+    slot.leads += 1;
+    slot.spend += costPerLead;
+
+    const tsLast = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+    const inWindow = Number.isFinite(tsLast) && tsLast >= sMs && tsLast < eMs;
+    if (inWindow && o.stageClass === "signed") slot.signed += 1;
+    if (
+      inWindow &&
+      (o.stageClass === "referred_out" ||
+        o.pipelinePurpose === "co_counsel_tracking" ||
+        o.pipelinePurpose === "referral_broker")
+    ) {
+      slot.referred += 1;
+    }
+  }
+
+  const byAreaState: AreaStateCostRow[] = Array.from(byAreaStateMap.values())
+    .map((r) => ({
+      area: r.area,
+      state: r.state,
+      spend: r.spend,
+      leads: r.leads,
+      signed: r.signed,
+      referred: r.referred,
+      cpl: r.leads > 0 ? r.spend / r.leads : null,
+      cpsc: r.signed > 0 ? r.spend / r.signed : null,
+    }))
+    .sort((a, b) => b.spend - a.spend);
+
+  // 6. Totals
   const totalSpend = byAd.reduce((s, r) => s + r.spend, 0);
   const totalLeadsMeta = byAd.reduce((s, r) => s + r.leadsMeta, 0);
   const totalSigned = byAd.reduce((s, r) => s + r.signed, 0);
@@ -191,6 +303,7 @@ export async function costAnalytics(
     totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
     byAd,
     byPracticeArea,
+    byAreaState,
     warnings,
   };
 }
