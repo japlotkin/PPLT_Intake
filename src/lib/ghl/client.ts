@@ -7,6 +7,7 @@
  * the data layer can decide whether to fall back or surface a warning.
  */
 import type { LocationKey } from "../types";
+import { acquire, release, notify429 } from "./rateLimiter";
 
 const V2_BASE = "https://services.leadconnectorhq.com";
 const V1_BASE = "https://rest.gohighlevel.com/v1";
@@ -37,26 +38,41 @@ async function fetchWithRetry(
   init: RequestInit,
   opts: ReqOptions = {}
 ): Promise<Response> {
-  const { retries = 3, timeoutMs = 30_000 } = opts;
+  const { retries = 6, timeoutMs = 45_000 } = opts;
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    await acquire();
     const ctl = new AbortController();
     const to = setTimeout(() => ctl.abort(), timeoutMs);
     try {
       const res = await fetch(url, { ...init, signal: ctl.signal });
       clearTimeout(to);
-      if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+      release();
+      if (res.status === 429) {
+        const retryAfter = Number(res.headers.get("retry-after") ?? 0);
+        const baseWait =
+          retryAfter > 0
+            ? retryAfter * 1000
+            : 1000 + 500 * Math.pow(2, attempt) + Math.random() * 500;
+        notify429(baseWait);
         if (attempt < retries) {
-          await sleep(500 * Math.pow(2, attempt));
+          await sleep(baseWait);
+          continue;
+        }
+      }
+      if (res.status >= 500 && res.status < 600) {
+        if (attempt < retries) {
+          await sleep(500 * Math.pow(2, attempt) + Math.random() * 200);
           continue;
         }
       }
       return res;
     } catch (e) {
       clearTimeout(to);
+      release();
       lastErr = e;
       if (attempt < retries) {
-        await sleep(500 * Math.pow(2, attempt));
+        await sleep(500 * Math.pow(2, attempt) + Math.random() * 200);
         continue;
       }
       throw e;

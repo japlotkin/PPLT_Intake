@@ -11,6 +11,19 @@ import type {
 } from "../types";
 import { getV2, GhlAuth } from "./client";
 
+/**
+ * Per-process short-lived memo for streamOpportunities.
+ *
+ * The dashboard calls this many times per request (every KPI block, every
+ * lead-analytics bucket, intake team, case analytics). Walking ~50k+ opps
+ * once and re-using it is dramatically cheaper than re-fetching 14+ times.
+ * 90-second TTL is short enough for "fresh-enough" data but spans a single
+ * dashboard render comfortably.
+ */
+const STREAM_TTL_MS = 90_000;
+type StreamCacheEntry = { expires: number; promise: Promise<RawOpportunity[]> };
+const streamCache = new Map<string, StreamCacheEntry>();
+
 export interface RawOpportunity {
   id: string;
   name?: string;
@@ -45,40 +58,54 @@ interface SearchResp {
   meta?: { nextPageUrl?: string; total?: number };
 }
 
-/** Paginate the opportunities search until done OR until a stop predicate fires. */
+/**
+ * Paginate the opportunities search until done.
+ *
+ * Memoized per location for STREAM_TTL_MS. Stop/filter callbacks are
+ * intentionally not part of the cache key — the cache only stores the
+ * full unfiltered list. Callers that need filtering apply it after the
+ * fetch (cheap since opps are already in memory).
+ */
 export async function streamOpportunities(
-  auth: GhlAuth,
-  stop?: (opp: RawOpportunity) => boolean,
-  filter?: (opp: RawOpportunity) => boolean
+  auth: GhlAuth
 ): Promise<RawOpportunity[]> {
-  const collected: RawOpportunity[] = [];
-  let url:
-    | string
-    | undefined = `/opportunities/search?location_id=${auth.locationId}&limit=100`;
-  let page = 0;
-  while (url) {
-    page++;
-    if (page > 500) break; // safety
-    const data: SearchResp = await getV2(auth, url.replace(/^.*?\//, "/"));
-    const opps = data.opportunities ?? [];
-    if (!opps.length) break;
-    for (const o of opps) {
-      if (!filter || filter(o)) collected.push(o);
-      if (stop && stop(o)) {
-        return collected;
+  const key = `opps:${auth.locationId}`;
+  const now = Date.now();
+  const cached = streamCache.get(key);
+  if (cached && cached.expires > now) return cached.promise;
+
+  const promise = (async () => {
+    const collected: RawOpportunity[] = [];
+    let url:
+      | string
+      | undefined = `/opportunities/search?location_id=${auth.locationId}&limit=100`;
+    let page = 0;
+    while (url) {
+      page++;
+      if (page > 500) break; // safety
+      const data: SearchResp = await getV2(auth, url.replace(/^.*?\//, "/"));
+      const opps = data.opportunities ?? [];
+      if (!opps.length) break;
+      collected.push(...opps);
+      const next = data.meta?.nextPageUrl;
+      if (!next) break;
+      try {
+        const u = new URL(next);
+        url = u.pathname + u.search;
+      } catch {
+        url = next;
       }
     }
-    const next = data.meta?.nextPageUrl;
-    if (!next) break;
-    // The API returns a full URL; strip the host so getV2 can prepend it.
-    try {
-      const u = new URL(next);
-      url = u.pathname + u.search;
-    } catch {
-      url = next;
-    }
-  }
-  return collected;
+    return collected;
+  })();
+
+  // Cache the promise immediately so concurrent callers share the fetch.
+  // If the fetch rejects, clear the entry so the next call retries.
+  streamCache.set(key, { expires: now + STREAM_TTL_MS, promise });
+  promise.catch(() => {
+    if (streamCache.get(key)?.promise === promise) streamCache.delete(key);
+  });
+  return promise;
 }
 
 export interface ClassifiedOpportunity {

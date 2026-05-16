@@ -3,6 +3,10 @@
  *
  * Returns the full DashboardData payload, cached for one hour per range
  * via Vercel KV (or in-process Map locally).
+ *
+ * Per-section settled fetching: if one section fails (rate limit, plan
+ * limit on emails/reviews, transient API error) the rest of the dashboard
+ * still renders and the failure shows up as a warning at the top.
  */
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
@@ -14,10 +18,51 @@ import { leadAnalyticsForBucket } from "@/lib/metrics/leadAnalytics";
 import { intakeTeamMetrics } from "@/lib/metrics/intakeTeam";
 import { caseAnalytics } from "@/lib/metrics/caseAnalytics";
 import { emailMetricsByBucket } from "@/lib/metrics/email";
-import type { DashboardData } from "@/lib/types";
+import type {
+  CaseAnalytics,
+  DashboardData,
+  EmailMetrics,
+  IntakeMemberMetrics,
+  KpiBlock,
+  LeadAnalytics,
+  OverviewData,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
+
+function emptyOverview(): OverviewData {
+  const z = { current: 0, previous: 0, pctChange: 0, direction: "flat" as const };
+  return {
+    leadsMonth: z,
+    leadsWeek: z,
+    referralsMonth: z,
+    referralsWeek: z,
+    signedMonth: z,
+    signedWeek: z,
+    activeTotal: 0,
+    reviews: { week: 0, month: 0, year: 0, lifetime: 0, perProfile: [] },
+  };
+}
+
+function emptyLead(): LeadAnalytics {
+  return { sourceMix: [], byStatus: [], conversionRatePct: 0, avgDaysToSigned: null };
+}
+
+function emptyCases(): CaseAnalytics {
+  return { byPracticeArea: [], byStatus: [], byCoCounsel: [], byState: [] };
+}
+
+async function settled<T>(label: string, fn: () => Promise<T>, fallback: T, warnings: string[]): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    warnings.push(`${label} failed: ${msg.slice(0, 200)}`);
+    return fallback;
+  }
+}
 
 export async function GET(req: Request) {
   const { userId } = await auth();
@@ -35,36 +80,56 @@ export async function GET(req: Request) {
       ? customRange(startISO, endISO)
       : rangeFor(preset);
 
-  const cacheKey = `dash:v1:${preset}:${range.start.toISOString()}:${range.end.toISOString()}`;
+  const cacheKey = `dash:v2:${preset}:${range.start.toISOString()}:${range.end.toISOString()}`;
 
   try {
     const data = await withCache<DashboardData>(cacheKey, ONE_HOUR_SECONDS, async () => {
       const warnings: string[] = [];
-      const [
-        overviewData,
-        kpi,
-        leadsSpanish,
-        leadsEnglish,
-        intakeTeam,
-        cases,
-        email,
-      ] = await Promise.all([
-        overview(),
-        kpiTable(),
-        leadAnalyticsForBucket("spanish", range.start, range.end),
-        leadAnalyticsForBucket("english", range.start, range.end),
-        intakeTeamMetrics(range.start, range.end),
-        caseAnalytics(),
-        emailMetricsByBucket(range.start, range.end),
-      ]);
-      if (overviewData.reviews.lifetime === 0) {
+
+      const [overviewData, kpi, leadsSpanish, leadsEnglish, intakeTeam, cases, email] =
+        await Promise.all([
+          settled<OverviewData>("Overview", () => overview(), emptyOverview(), warnings),
+          settled<{ months: KpiBlock[]; quarters: KpiBlock[] }>(
+            "KPI table",
+            () => kpiTable(),
+            { months: [], quarters: [] },
+            warnings
+          ),
+          settled<LeadAnalytics>(
+            "Spanish lead analytics",
+            () => leadAnalyticsForBucket("spanish", range.start, range.end),
+            emptyLead(),
+            warnings
+          ),
+          settled<LeadAnalytics>(
+            "English lead analytics",
+            () => leadAnalyticsForBucket("english", range.start, range.end),
+            emptyLead(),
+            warnings
+          ),
+          settled<IntakeMemberMetrics[]>(
+            "Intake team",
+            () => intakeTeamMetrics(range.start, range.end),
+            [],
+            warnings
+          ),
+          settled<CaseAnalytics>("Case analytics", () => caseAnalytics(), emptyCases(), warnings),
+          settled<EmailMetrics[]>(
+            "Email metrics",
+            () => emailMetricsByBucket(range.start, range.end),
+            [],
+            warnings
+          ),
+        ]);
+
+      if (overviewData.reviews.lifetime === 0 && overviewData.reviews.perProfile.length === 0) {
         warnings.push(
           "Google review counts unavailable — GHL reputation endpoint did not return data."
         );
       }
-      if (email.every((b) => b.sends === 0 && b.opens === 0)) {
+      if (email.length === 0 || email.every((b) => b.sends === 0 && b.opens === 0)) {
         warnings.push(
-          "Email metrics unavailable — GHL email events endpoint did not return data on this plan."
+          "Email metrics unavailable or zero — GHL email events endpoint did not return data on this plan."
         );
       }
       return {
