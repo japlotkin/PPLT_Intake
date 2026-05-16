@@ -182,12 +182,17 @@ export interface IntakeMemberMetrics {
 // ----- case analytics -----
 export interface CaseAnalytics {
   byPracticeArea: Array<{ area: string; count: number }>;
-  byStatus: Array<{ status: string; count: number }>;
   byCoCounsel: Array<{ firm: string; count: number }>;
+  // Same shape as byCoCounsel but filtered to opps that reached a Signed
+  // stage inside the co-counsel pipeline (the firm actually signed the
+  // case after we referred it).
+  byCoCounselSigned: Array<{ firm: string; count: number }>;
   byState: Array<{ state: string; count: number }>;
   // Lexamica + Litify are referral brokers, not law firms. They get
   // pulled out of the co-counsel chart and shown as a footnote.
   referralBrokers?: { lexamica: number; litify: number };
+  // Same for signed-at-broker (rarely useful but exposed for transparency).
+  referralBrokersSigned?: { lexamica: number; litify: number };
 }
 
 // ----- top-level payload -----

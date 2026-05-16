@@ -47,7 +47,7 @@ function emptyLead(): LeadAnalytics {
   return { sourceMix: [], byStatus: [], conversionRatePct: 0, avgDaysToSigned: null };
 }
 function emptyCases(): CaseAnalytics {
-  return { byPracticeArea: [], byStatus: [], byCoCounsel: [], byState: [] };
+  return { byPracticeArea: [], byCoCounsel: [], byCoCounselSigned: [], byState: [] };
 }
 
 async function settled<T>(

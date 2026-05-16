@@ -13,11 +13,9 @@ import {
   classifyOpportunities,
   streamOpportunities,
 } from "../ghl/opportunities";
-import { getLocation, practiceAreaLabel, stageClassLabel } from "../mapping";
+import { getLocation, practiceAreaLabel } from "../mapping";
 import { sortDescByCount } from "./helpers";
 import type { CaseAnalytics, LocationKey } from "../types";
-
-const REFERRAL_BROKER_NAMES = new Set(["lexamica", "litify"]);
 
 function stateFromOpp(
   o: ReturnType<typeof classifyOpportunities>[number],
@@ -114,29 +112,32 @@ export async function caseAnalytics(bucket: CaseBucket = "combined"): Promise<Ca
   const contactStateA = buildContactStateIndex(contactsA, stateFieldsA);
   const contactStateP = buildContactStateIndex(contactsP, stateFieldsP);
 
-  const activeA = activeNow(oppsA);
-  const activeP = activeNow(oppsP);
-  let all: typeof activeA;
+  // Pick the right pool of opportunities for the bucket.
+  let oppsBucket: typeof oppsA;
   switch (bucket) {
     case "english":
-      all = activeP; // PPLT = English book
+      oppsBucket = oppsP;
       break;
     case "spanish":
-      all = activeA; // Abogado = Spanish book
+      oppsBucket = oppsA;
       break;
     case "combined":
     default:
-      all = [...activeA, ...activeP];
+      oppsBucket = [...oppsA, ...oppsP];
   }
+  const active = activeNow(oppsBucket);
 
   const paMap = new Map<string, number>();
-  const stMap = new Map<string, number>();
-  const ccMap = new Map<string, number>();
+  const ccActiveMap = new Map<string, number>();
+  const ccSignedMap = new Map<string, number>();
   const stateMap = new Map<string, number>();
-  let lexamicaCount = 0;
-  let litifyCount = 0;
+  let lexamicaActive = 0;
+  let litifyActive = 0;
+  let lexamicaSigned = 0;
+  let litifySigned = 0;
 
-  for (const o of all) {
+  // Active-only views (practice area, currently-with-co-counsel, state)
+  for (const o of active) {
     if (o.pipelinePurpose === "active_practice") {
       const label = practiceAreaLabel(o.practiceArea);
       paMap.set(label, (paMap.get(label) ?? 0) + 1);
@@ -146,44 +147,54 @@ export async function caseAnalytics(bucket: CaseBucket = "combined"): Promise<Ca
     ) {
       const firm = o.coCounselFirm ?? o.pipelineName;
       const firmLower = firm.toLowerCase();
-      // Lexamica and Litify are referral *brokers*, not co-counsel firms;
-      // they swamp the chart and obscure the named firms. Track them
-      // separately and surface as a footnote.
-      if (firmLower.includes("lexamica")) {
-        lexamicaCount++;
-      } else if (firmLower.includes("litify")) {
-        litifyCount++;
-      } else {
-        ccMap.set(firm, (ccMap.get(firm) ?? 0) + 1);
-      }
+      if (firmLower.includes("lexamica")) lexamicaActive++;
+      else if (firmLower.includes("litify")) litifyActive++;
+      else ccActiveMap.set(firm, (ccActiveMap.get(firm) ?? 0) + 1);
     }
-    const statusLabel = stageClassLabel(o.stageClass);
-    stMap.set(statusLabel, (stMap.get(statusLabel) ?? 0) + 1);
-
     const idx = o.locationKey === "abogado" ? contactStateA : contactStateP;
     const fields = o.locationKey === "abogado" ? stateFieldsA : stateFieldsP;
     const st = stateFromOpp(o, idx, fields);
     if (st) stateMap.set(st, (stateMap.get(st) ?? 0) + 1);
   }
 
+  // Signed-by-co-counsel view: ALL opps in the 180d window that reached a
+  // signed stage *while in a co-counsel/referral-broker pipeline*. Counts
+  // include both currently-signed and later-withdrawn-after-signing.
+  for (const o of oppsBucket) {
+    if (!o.includeInMetrics) continue;
+    if (o.stageClass !== "signed") continue;
+    if (
+      o.pipelinePurpose !== "co_counsel_tracking" &&
+      o.pipelinePurpose !== "referral_broker"
+    )
+      continue;
+    const firm = o.coCounselFirm ?? o.pipelineName;
+    const firmLower = firm.toLowerCase();
+    if (firmLower.includes("lexamica")) lexamicaSigned++;
+    else if (firmLower.includes("litify")) litifySigned++;
+    else ccSignedMap.set(firm, (ccSignedMap.get(firm) ?? 0) + 1);
+  }
+
   return {
     byPracticeArea: sortDescByCount(
       Array.from(paMap.entries()).map(([area, count]) => ({ area, count }))
     ),
-    byStatus: sortDescByCount(
-      Array.from(stMap.entries()).map(([status, count]) => ({ status, count }))
-    ),
     byCoCounsel: sortDescByCount(
-      Array.from(ccMap.entries()).map(([firm, count]) => ({ firm, count }))
+      Array.from(ccActiveMap.entries()).map(([firm, count]) => ({ firm, count }))
+    ),
+    byCoCounselSigned: sortDescByCount(
+      Array.from(ccSignedMap.entries()).map(([firm, count]) => ({ firm, count }))
     ),
     byState: sortDescByCount(
       Array.from(stateMap.entries()).map(([state, count]) => ({ state, count }))
     ),
     referralBrokers: {
-      lexamica: lexamicaCount,
-      litify: litifyCount,
+      lexamica: lexamicaActive,
+      litify: litifyActive,
+    },
+    referralBrokersSigned: {
+      lexamica: lexamicaSigned,
+      litify: litifySigned,
     },
   };
 }
-
-void REFERRAL_BROKER_NAMES; // exported constant reserved for future use

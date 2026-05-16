@@ -721,16 +721,16 @@ export default function DashboardView({
           <ChartCard title="By Practice Area">
             <BarCount data={view.byPracticeArea.map((r) => ({ name: r.area, value: r.count }))} />
           </ChartCard>
-          <ChartCard title="By Status">
-            <BarCount data={view.byStatus.map((r) => ({ name: r.status, value: r.count }))} />
+          <ChartCard title="By State" subtitle="State (Jurisdiction) field, top 15">
+            <BarCount data={view.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
           </ChartCard>
           <ChartCard
-            title="By Co-Counsel Firm"
-            subtitle="Top 15 (excludes referral brokers)"
+            title="Active at Co-Counsel Firm"
+            subtitle="Top 15 · open referrals (excl. brokers)"
             footer={
               brokers && (brokers.lexamica > 0 || brokers.litify > 0) ? (
                 <>
-                  <span className="font-medium text-slate-700">Referral brokers:</span>{" "}
+                  <span className="font-medium text-slate-700">Referral brokers (active):</span>{" "}
                   Lexamica {brokers.lexamica.toLocaleString()} · Litify{" "}
                   {brokers.litify.toLocaleString()}
                 </>
@@ -739,8 +739,20 @@ export default function DashboardView({
           >
             <BarCount data={view.byCoCounsel.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
           </ChartCard>
-          <ChartCard title="By State" subtitle="State (Jurisdiction) field, top 15">
-            <BarCount data={view.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
+          <ChartCard
+            title="Signed by Co-Counsel Firm"
+            subtitle="Top 15 · firm signed the referred case"
+            footer={
+              view.referralBrokersSigned && (view.referralBrokersSigned.lexamica > 0 || view.referralBrokersSigned.litify > 0) ? (
+                <>
+                  <span className="font-medium text-slate-700">Referral brokers (signed):</span>{" "}
+                  Lexamica {view.referralBrokersSigned.lexamica.toLocaleString()} · Litify{" "}
+                  {view.referralBrokersSigned.litify.toLocaleString()}
+                </>
+              ) : null
+            }
+          >
+            <BarCount data={view.byCoCounselSigned.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
           </ChartCard>
         </div>
       </>
