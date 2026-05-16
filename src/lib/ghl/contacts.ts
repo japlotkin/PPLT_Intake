@@ -48,6 +48,12 @@ const streamCache = new Map<string, StreamCacheEntry>();
  * Walk all contacts created in the last CONTACT_WALK_DAYS, sorted desc.
  * Memoized per location for ~5 minutes so KPI / Lead / Overview share
  * one fetch instead of paginating independently.
+ *
+ * GHL v2 /contacts/search uses page-based pagination (1-indexed); the
+ * `searchAfter` cursor we tried first wasn't returned in the response,
+ * so every call after page 1 was a no-op and we always got the same
+ * 100 most-recent contacts. With `page`, we walk newest -> oldest and
+ * stop once an entire page falls below the cutoff date.
  */
 export async function streamContacts(auth: GhlAuth): Promise<RawContact[]> {
   const key = `contacts:${auth.locationId}`;
@@ -60,18 +66,21 @@ export async function streamContacts(auth: GhlAuth): Promise<RawContact[]> {
 
   const promise = (async () => {
     const out: RawContact[] = [];
-    let searchAfter: unknown = undefined;
     let page = 0;
+    let totalReported: number | undefined;
     while (page < 500) {
       page++;
       const body: Record<string, unknown> = {
         locationId: auth.locationId,
         pageLimit,
+        page,
         sort: [{ field: "dateAdded", direction: "desc" }],
       };
-      if (searchAfter) body.searchAfter = searchAfter;
       const resp: SearchResp = await postV2(auth, "/contacts/search", body);
       const got = resp.contacts ?? [];
+      if (totalReported === undefined && typeof resp.total === "number") {
+        totalReported = resp.total;
+      }
       if (got.length === 0) break;
 
       let oldestOnPageMs = Infinity;
@@ -81,12 +90,13 @@ export async function streamContacts(auth: GhlAuth): Promise<RawContact[]> {
         if (t >= cutoffMs) out.push(c);
         if (t < oldestOnPageMs) oldestOnPageMs = t;
       }
-      // Stop once the whole page is older than the cutoff.
       if (oldestOnPageMs < cutoffMs && oldestOnPageMs !== Infinity) break;
       if (got.length < pageLimit) break;
-      searchAfter = resp.searchAfter;
-      if (!searchAfter) break;
     }
+    console.log(
+      `[streamContacts] ${auth.key} fetched ${out.length} contacts in last ${CONTACT_WALK_DAYS}d ` +
+        `(scanned ${page} page(s), location total=${totalReported ?? "?"})`
+    );
     return out;
   })();
 

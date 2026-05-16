@@ -55,6 +55,36 @@ function initials(name: string): string {
     .join("");
 }
 
+const SECTIONS = [
+  { id: "overview", label: "Overview" },
+  { id: "kpi", label: "KPIs" },
+  { id: "email", label: "Email" },
+  { id: "leads", label: "Lead Analytics" },
+  { id: "intake", label: "Intake Team" },
+  { id: "cases", label: "Case Analytics" },
+];
+
+function SectionNav() {
+  return (
+    <aside className="hidden lg:block w-48 shrink-0">
+      <div className="sticky top-24 space-y-0.5">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-3 pb-2">
+          Sections
+        </div>
+        {SECTIONS.map((s) => (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="block px-3 py-1.5 rounded-md text-sm text-slate-600 hover:text-blue-700 hover:bg-blue-50/60 transition-colors"
+          >
+            {s.label}
+          </a>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 function timeAgo(iso: string): string {
   const ms = Date.now() - Date.parse(iso);
   if (!Number.isFinite(ms) || ms < 0) return "just now";
@@ -190,7 +220,9 @@ export default function DashboardView({
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-10">
+      <div className="max-w-[1400px] mx-auto px-6 py-8 flex gap-8">
+        <SectionNav />
+        <main className="flex-1 min-w-0 space-y-10">
         {loading && !data && !needsSync && (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center space-y-2">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
@@ -274,14 +306,15 @@ export default function DashboardView({
             </p>
           </>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 
   function Overview({ data }: { data: DashboardData }) {
     const o = data.overview;
     return (
-      <section>
+      <section id="overview">
         <SectionHeader title="Overview" subtitle="This period vs prior period" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -362,7 +395,7 @@ export default function DashboardView({
 
   function Kpi({ data }: { data: DashboardData }) {
     return (
-      <section>
+      <section id="kpi">
         <SectionHeader
           title="KPIs"
           subtitle="Spanish vs English, by month and quarter"
@@ -396,7 +429,7 @@ export default function DashboardView({
   function EmailBlock({ data }: { data: DashboardData }) {
     if (!data.email || data.email.length === 0) return null;
     return (
-      <section>
+      <section id="email">
         <SectionHeader
           title="Email"
           subtitle="GHL email campaigns by bucket, current range"
@@ -474,7 +507,7 @@ export default function DashboardView({
 
   function LeadsBlock({ data }: { data: DashboardData }) {
     return (
-      <section>
+      <section id="leads">
         <SectionHeader
           title="Lead Analytics"
           subtitle="Sources, status mix, and conversion — current range"
@@ -564,14 +597,14 @@ export default function DashboardView({
   function IntakeTeamBlock({ data }: { data: DashboardData }) {
     if (!data.intakeTeam || data.intakeTeam.length === 0) {
       return (
-        <section>
+        <section id="intake">
           <SectionHeader title="Intake Team" />
           <EmptyState />
         </section>
       );
     }
     return (
-      <section>
+      <section id="intake">
         <SectionHeader
           title="Intake Team"
           subtitle="Per-member referrals, calls, SMS, and trends"
@@ -640,8 +673,9 @@ export default function DashboardView({
 
   function CasesBlock({ data }: { data: DashboardData }) {
     const c = data.cases;
+    const brokers = c.referralBrokers;
     return (
-      <section>
+      <section id="cases">
         <SectionHeader
           title="Case Analytics"
           subtitle="Snapshot of active cases (not date-filtered)"
@@ -653,10 +687,22 @@ export default function DashboardView({
           <ChartCard title="By Status">
             <BarCount data={c.byStatus.map((r) => ({ name: r.status, value: r.count }))} />
           </ChartCard>
-          <ChartCard title="By Co-Counsel Firm" subtitle="Top 15">
+          <ChartCard
+            title="By Co-Counsel Firm"
+            subtitle="Top 15 (excludes referral brokers)"
+            footer={
+              brokers && (brokers.lexamica > 0 || brokers.litify > 0) ? (
+                <>
+                  <span className="font-medium text-slate-700">Referral brokers:</span>{" "}
+                  Lexamica {brokers.lexamica.toLocaleString()} · Litify{" "}
+                  {brokers.litify.toLocaleString()}
+                </>
+              ) : null
+            }
+          >
             <BarCount data={c.byCoCounsel.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
           </ChartCard>
-          <ChartCard title="By State" subtitle="Top 15">
+          <ChartCard title="By State" subtitle="State (Jurisdiction) field, top 15">
             <BarCount data={c.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
           </ChartCard>
         </div>
@@ -668,10 +714,12 @@ export default function DashboardView({
     title,
     subtitle,
     children,
+    footer,
   }: {
     title: string;
     subtitle?: string;
     children: ReactNode;
+    footer?: ReactNode;
   }) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -680,6 +728,9 @@ export default function DashboardView({
           {subtitle && <span className="text-[11px] text-slate-500">{subtitle}</span>}
         </div>
         {children}
+        {footer && (
+          <p className="mt-3 text-[11px] text-slate-500 leading-relaxed">{footer}</p>
+        )}
       </div>
     );
   }

@@ -7,6 +7,7 @@
  * them up in priority order for each opp until we find a non-empty value.
  */
 import { authAbogado, authPplt } from "../ghl/client";
+import { streamContacts } from "../ghl/contacts";
 import {
   activeNow,
   classifyOpportunities,
@@ -16,17 +17,28 @@ import { getLocation, practiceAreaLabel, stageClassLabel } from "../mapping";
 import { sortDescByCount } from "./helpers";
 import type { CaseAnalytics, LocationKey } from "../types";
 
+const REFERRAL_BROKER_NAMES = new Set(["lexamica", "litify"]);
+
 function stateFromOpp(
   o: ReturnType<typeof classifyOpportunities>[number],
+  contactStateById: Map<string, string>,
   stateFieldIds: string[]
 ): string | null {
-  const cfList = o.raw.customFields ?? [];
-  const cfMap = new Map(cfList.map((cf) => [cf.id, cf.fieldValue]));
-  for (const id of stateFieldIds) {
-    const v = cfMap.get(id);
-    if (typeof v === "string" && v.trim()) return v.trim().toUpperCase();
+  // 1. Opportunity-level custom fields (rarely populated, but cheap to check)
+  const oppCfList = o.raw.customFields ?? [];
+  if (oppCfList.length > 0) {
+    const cfMap = new Map(oppCfList.map((cf) => [cf.id, cf.fieldValue]));
+    for (const id of stateFieldIds) {
+      const v = cfMap.get(id);
+      if (typeof v === "string" && v.trim()) return v.trim().toUpperCase();
+    }
   }
-  // Fall back to contact.state if attached
+  // 2. Joined contact's state custom field
+  if (o.raw.contactId) {
+    const fromContact = contactStateById.get(o.raw.contactId);
+    if (fromContact) return fromContact;
+  }
+  // 3. contact.state direct field
   const contactState = o.raw.contact?.state;
   if (typeof contactState === "string" && contactState.trim()) {
     return contactState.trim().toUpperCase();
@@ -52,28 +64,66 @@ function stateFieldIdsFor(key: LocationKey): string[] {
   return ranked.map((r) => r.f.id);
 }
 
+/** Build a contactId -> state map by reading the State (Jurisdiction) custom
+ * field on each contact. Falls back to the contact's own `state` property. */
+function buildContactStateIndex(
+  contacts: Array<{
+    id: string;
+    state?: string;
+    customFields?: Array<{ id: string; value?: unknown }>;
+  }>,
+  stateFieldIds: string[]
+): Map<string, string> {
+  const idx = new Map<string, string>();
+  for (const c of contacts) {
+    let chosen: string | null = null;
+    const cfList = c.customFields ?? [];
+    if (cfList.length > 0) {
+      const cfMap = new Map(cfList.map((cf) => [cf.id, cf.value]));
+      for (const id of stateFieldIds) {
+        const v = cfMap.get(id);
+        if (typeof v === "string" && v.trim()) {
+          chosen = v.trim().toUpperCase();
+          break;
+        }
+      }
+    }
+    if (!chosen && typeof c.state === "string" && c.state.trim()) {
+      chosen = c.state.trim().toUpperCase();
+    }
+    if (chosen) idx.set(c.id, chosen);
+  }
+  return idx;
+}
+
 export async function caseAnalytics(): Promise<CaseAnalytics> {
   const authA = authAbogado();
   const authP = authPplt();
-  const [oppsA, oppsP] = await Promise.all([
+  const stateFieldsA = stateFieldIdsFor("abogado");
+  const stateFieldsP = stateFieldIdsFor("pplt_leads");
+
+  const [oppsA, oppsP, contactsA, contactsP] = await Promise.all([
     streamOpportunities(authA).then((r) => classifyOpportunities(authA, r)),
     streamOpportunities(authP).then((r) => classifyOpportunities(authP, r)),
+    streamContacts(authA),
+    streamContacts(authP),
   ]);
+
+  const contactStateA = buildContactStateIndex(contactsA, stateFieldsA);
+  const contactStateP = buildContactStateIndex(contactsP, stateFieldsP);
 
   const activeA = activeNow(oppsA);
   const activeP = activeNow(oppsP);
   const all = [...activeA, ...activeP];
 
-  const stateFieldsA = stateFieldIdsFor("abogado");
-  const stateFieldsP = stateFieldIdsFor("pplt_leads");
-
   const paMap = new Map<string, number>();
   const stMap = new Map<string, number>();
   const ccMap = new Map<string, number>();
   const stateMap = new Map<string, number>();
+  let lexamicaCount = 0;
+  let litifyCount = 0;
 
   for (const o of all) {
-    // Practice area: only count in-house pipelines (co-counsel pipelines counted separately)
     if (o.pipelinePurpose === "active_practice") {
       const label = practiceAreaLabel(o.practiceArea);
       paMap.set(label, (paMap.get(label) ?? 0) + 1);
@@ -82,15 +132,24 @@ export async function caseAnalytics(): Promise<CaseAnalytics> {
       o.pipelinePurpose === "referral_broker"
     ) {
       const firm = o.coCounselFirm ?? o.pipelineName;
-      ccMap.set(firm, (ccMap.get(firm) ?? 0) + 1);
+      const firmLower = firm.toLowerCase();
+      // Lexamica and Litify are referral *brokers*, not co-counsel firms;
+      // they swamp the chart and obscure the named firms. Track them
+      // separately and surface as a footnote.
+      if (firmLower.includes("lexamica")) {
+        lexamicaCount++;
+      } else if (firmLower.includes("litify")) {
+        litifyCount++;
+      } else {
+        ccMap.set(firm, (ccMap.get(firm) ?? 0) + 1);
+      }
     }
-    // Status (stage class) snapshot across all active
     const statusLabel = stageClassLabel(o.stageClass);
     stMap.set(statusLabel, (stMap.get(statusLabel) ?? 0) + 1);
 
-    // State
+    const idx = o.locationKey === "abogado" ? contactStateA : contactStateP;
     const fields = o.locationKey === "abogado" ? stateFieldsA : stateFieldsP;
-    const st = stateFromOpp(o, fields);
+    const st = stateFromOpp(o, idx, fields);
     if (st) stateMap.set(st, (stateMap.get(st) ?? 0) + 1);
   }
 
@@ -107,5 +166,11 @@ export async function caseAnalytics(): Promise<CaseAnalytics> {
     byState: sortDescByCount(
       Array.from(stateMap.entries()).map(([state, count]) => ({ state, count }))
     ),
+    referralBrokers: {
+      lexamica: lexamicaCount,
+      litify: litifyCount,
+    },
   };
 }
+
+void REFERRAL_BROKER_NAMES; // exported constant reserved for future use

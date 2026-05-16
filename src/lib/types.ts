@@ -182,6 +182,9 @@ export interface CaseAnalytics {
   byStatus: Array<{ status: string; count: number }>;
   byCoCounsel: Array<{ firm: string; count: number }>;
   byState: Array<{ state: string; count: number }>;
+  // Lexamica + Litify are referral brokers, not law firms. They get
+  // pulled out of the co-counsel chart and shown as a footnote.
+  referralBrokers?: { lexamica: number; litify: number };
 }
 
 // ----- top-level payload -----
