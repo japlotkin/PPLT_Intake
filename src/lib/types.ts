@@ -110,12 +110,14 @@ export interface DeltaStat {
 }
 
 export interface OverviewData {
-  leadsMonth: DeltaStat;
-  leadsWeek: DeltaStat;
-  referralsMonth: DeltaStat;
-  referralsWeek: DeltaStat;
-  signedMonth: DeltaStat;
-  signedWeek: DeltaStat;
+  // Rolling windows: last 30 days vs prior 30 days, last 7 days vs prior 7 days.
+  // Easier to compare than partial-calendar-month/week which look wrong mid-period.
+  leads30: DeltaStat;
+  leads7: DeltaStat;
+  referrals30: DeltaStat;
+  referrals7: DeltaStat;
+  signed30: DeltaStat;
+  signed7: DeltaStat;
   activeTotal: number;
   reviews: {
     week: number;
@@ -169,10 +171,11 @@ export interface IntakeMemberMetrics {
   callsOutbound: number;
   sms: number;
   avgPickupSeconds: number | null;
-  referralsMonth: DeltaStat;
-  referralsWeek: DeltaStat;
-  signedMonth: DeltaStat;
-  signedWeek: DeltaStat;
+  // Rolling windows (matches Overview): last 30 days vs prior 30, last 7 vs prior 7.
+  referrals30: DeltaStat;
+  referrals7: DeltaStat;
+  signed30: DeltaStat;
+  signed7: DeltaStat;
   activeFromReferrals: number;
 }
 
@@ -197,7 +200,9 @@ export interface DashboardData {
   leadsEnglish: LeadAnalytics;
   leadsSpanish: LeadAnalytics;
   intakeTeam: IntakeMemberMetrics[];
-  cases: CaseAnalytics;
+  cases: CaseAnalytics; // combined view (English + Spanish)
+  casesEnglish?: CaseAnalytics; // PPLT-only
+  casesSpanish?: CaseAnalytics; // Abogado-only
   warnings: string[]; // non-fatal data issues we want to surface
   // Snapshot metadata (added when read from KV). Optional because the
   // mock-data endpoint doesn't set these.

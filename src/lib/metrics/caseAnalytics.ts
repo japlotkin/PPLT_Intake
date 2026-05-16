@@ -96,7 +96,9 @@ function buildContactStateIndex(
   return idx;
 }
 
-export async function caseAnalytics(): Promise<CaseAnalytics> {
+export type CaseBucket = "combined" | "english" | "spanish";
+
+export async function caseAnalytics(bucket: CaseBucket = "combined"): Promise<CaseAnalytics> {
   const authA = authAbogado();
   const authP = authPplt();
   const stateFieldsA = stateFieldIdsFor("abogado");
@@ -114,7 +116,18 @@ export async function caseAnalytics(): Promise<CaseAnalytics> {
 
   const activeA = activeNow(oppsA);
   const activeP = activeNow(oppsP);
-  const all = [...activeA, ...activeP];
+  let all: typeof activeA;
+  switch (bucket) {
+    case "english":
+      all = activeP; // PPLT = English book
+      break;
+    case "spanish":
+      all = activeA; // Abogado = Spanish book
+      break;
+    case "combined":
+    default:
+      all = [...activeA, ...activeP];
+  }
 
   const paMap = new Map<string, number>();
   const stMap = new Map<string, number>();

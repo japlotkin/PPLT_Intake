@@ -18,7 +18,7 @@ import {
   streamOpportunities,
 } from "../ghl/opportunities";
 import { intakeUsers, getLocation } from "../mapping";
-import { rangeFor } from "../dateRanges";
+import { rangeFor, previousPeriod } from "../dateRanges";
 import { delta } from "./helpers";
 import type { IntakeMemberMetrics } from "../types";
 
@@ -110,10 +110,11 @@ export async function intakeTeamMetrics(
     seen.set(k, slot);
   }
 
-  const monthRange = rangeFor("this_month", now);
-  const lastMonthRange = rangeFor("last_month", now);
-  const weekRange = rangeFor("this_week", now);
-  const lastWeekRange = rangeFor("last_week", now);
+  // Rolling windows: last 30 days vs prior 30, last 7 vs prior 7.
+  const last30 = rangeFor("last_30_days", now);
+  const prev30 = previousPeriod(last30);
+  const last7 = rangeFor("last_7_days", now);
+  const prev7 = previousPeriod(last7);
 
   const out: IntakeMemberMetrics[] = [];
 
@@ -122,10 +123,10 @@ export async function intakeTeamMetrics(
     const pId = slot.idsByLoc.pplt_leads;
 
     const rangeStats = sumRangeStats(oppsA, oppsP, aId, pId, start, end);
-    const monthCur = sumRangeStats(oppsA, oppsP, aId, pId, monthRange.start, monthRange.end);
-    const monthPrev = sumRangeStats(oppsA, oppsP, aId, pId, lastMonthRange.start, lastMonthRange.end);
-    const weekCur = sumRangeStats(oppsA, oppsP, aId, pId, weekRange.start, weekRange.end);
-    const weekPrev = sumRangeStats(oppsA, oppsP, aId, pId, lastWeekRange.start, lastWeekRange.end);
+    const cur30 = sumRangeStats(oppsA, oppsP, aId, pId, last30.start, last30.end);
+    const prev30Stats = sumRangeStats(oppsA, oppsP, aId, pId, prev30.start, prev30.end);
+    const cur7 = sumRangeStats(oppsA, oppsP, aId, pId, last7.start, last7.end);
+    const prev7Stats = sumRangeStats(oppsA, oppsP, aId, pId, prev7.start, prev7.end);
 
     const cA = aId ? convA.callsByUser.get(aId) : undefined;
     const cP = pId ? convP.callsByUser.get(pId) : undefined;
@@ -148,10 +149,10 @@ export async function intakeTeamMetrics(
       callsOutbound: outbound,
       sms,
       avgPickupSeconds,
-      referralsMonth: delta(monthCur.referrals, monthPrev.referrals),
-      referralsWeek: delta(weekCur.referrals, weekPrev.referrals),
-      signedMonth: delta(monthCur.signedFromReferrals, monthPrev.signedFromReferrals),
-      signedWeek: delta(weekCur.signedFromReferrals, weekPrev.signedFromReferrals),
+      referrals30: delta(cur30.referrals, prev30Stats.referrals),
+      referrals7: delta(cur7.referrals, prev7Stats.referrals),
+      signed30: delta(cur30.signedFromReferrals, prev30Stats.signedFromReferrals),
+      signed7: delta(cur7.signedFromReferrals, prev7Stats.signedFromReferrals),
       activeFromReferrals: rangeStats.activeFromReferrals,
     });
   }

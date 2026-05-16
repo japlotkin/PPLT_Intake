@@ -315,49 +315,49 @@ export default function DashboardView({
     const o = data.overview;
     return (
       <section id="overview">
-        <SectionHeader title="Overview" subtitle="This period vs prior period" />
+        <SectionHeader title="Overview" subtitle="Last 30 days vs prior 30 days, last 7 days vs prior 7 days" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={Users}
-            label="Leads · This Month"
-            value={o.leadsMonth.current.toLocaleString()}
-            delta={o.leadsMonth}
-            sub={`Last month: ${o.leadsMonth.previous.toLocaleString()}`}
+            label="Leads · Last 30 Days"
+            value={o.leads30.current.toLocaleString()}
+            delta={o.leads30}
+            sub={`Prior 30 days: ${o.leads30.previous.toLocaleString()}`}
           />
           <StatCard
             icon={Users}
-            label="Leads · This Week"
-            value={o.leadsWeek.current.toLocaleString()}
-            delta={o.leadsWeek}
-            sub={`Last week: ${o.leadsWeek.previous.toLocaleString()}`}
+            label="Leads · Last 7 Days"
+            value={o.leads7.current.toLocaleString()}
+            delta={o.leads7}
+            sub={`Prior 7 days: ${o.leads7.previous.toLocaleString()}`}
           />
           <StatCard
             icon={UserPlus}
-            label="Referrals · This Month"
-            value={o.referralsMonth.current.toLocaleString()}
-            delta={o.referralsMonth}
-            sub={`Last month: ${o.referralsMonth.previous.toLocaleString()}`}
+            label="Referrals · Last 30 Days"
+            value={o.referrals30.current.toLocaleString()}
+            delta={o.referrals30}
+            sub={`Prior 30 days: ${o.referrals30.previous.toLocaleString()}`}
           />
           <StatCard
             icon={UserPlus}
-            label="Referrals · This Week"
-            value={o.referralsWeek.current.toLocaleString()}
-            delta={o.referralsWeek}
-            sub={`Last week: ${o.referralsWeek.previous.toLocaleString()}`}
+            label="Referrals · Last 7 Days"
+            value={o.referrals7.current.toLocaleString()}
+            delta={o.referrals7}
+            sub={`Prior 7 days: ${o.referrals7.previous.toLocaleString()}`}
           />
           <StatCard
             icon={CheckCircle2}
-            label="Signed · This Month"
-            value={o.signedMonth.current.toLocaleString()}
-            delta={o.signedMonth}
-            sub={`Last month: ${o.signedMonth.previous.toLocaleString()}`}
+            label="Signed · Last 30 Days"
+            value={o.signed30.current.toLocaleString()}
+            delta={o.signed30}
+            sub={`Prior 30 days: ${o.signed30.previous.toLocaleString()}`}
           />
           <StatCard
             icon={CheckCircle2}
-            label="Signed · This Week"
-            value={o.signedWeek.current.toLocaleString()}
-            delta={o.signedWeek}
-            sub={`Last week: ${o.signedWeek.previous.toLocaleString()}`}
+            label="Signed · Last 7 Days"
+            value={o.signed7.current.toLocaleString()}
+            delta={o.signed7}
+            sub={`Prior 7 days: ${o.signed7.previous.toLocaleString()}`}
           />
           <StatCard
             icon={Briefcase}
@@ -620,10 +620,10 @@ export default function DashboardView({
                 <th className="text-right px-4 py-2.5 font-semibold">Calls Out</th>
                 <th className="text-right px-4 py-2.5 font-semibold">SMS</th>
                 <th className="text-right px-4 py-2.5 font-semibold">Avg call</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Ref MoM</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Ref WoW</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Signed MoM</th>
-                <th className="text-right px-4 py-2.5 font-semibold">Signed WoW</th>
+                <th className="text-right px-4 py-2.5 font-semibold">Ref 30d</th>
+                <th className="text-right px-4 py-2.5 font-semibold">Ref 7d</th>
+                <th className="text-right px-4 py-2.5 font-semibold">Signed 30d</th>
+                <th className="text-right px-4 py-2.5 font-semibold">Signed 7d</th>
                 <th className="text-right px-4 py-2.5 font-semibold text-blue-700">Active</th>
               </tr>
             </thead>
@@ -652,10 +652,10 @@ export default function DashboardView({
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">
                     {fmtSeconds(m.avgPickupSeconds)}
                   </td>
-                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.referralsMonth} /></td>
-                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.referralsWeek} /></td>
-                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.signedMonth} /></td>
-                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.signedWeek} /></td>
+                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.referrals30} /></td>
+                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.referrals7} /></td>
+                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.signed30} /></td>
+                  <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.signed7} /></td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">
                     {m.activeFromReferrals}
                   </td>
@@ -672,20 +672,57 @@ export default function DashboardView({
   }
 
   function CasesBlock({ data }: { data: DashboardData }) {
-    const c = data.cases;
-    const brokers = c.referralBrokers;
     return (
       <section id="cases">
         <SectionHeader
           title="Case Analytics"
           subtitle="Snapshot of active cases (not date-filtered)"
         />
+        <CasesTabs data={data} />
+      </section>
+    );
+  }
+
+  function CasesTabs({ data }: { data: DashboardData }) {
+    const [bucket, setBucket] = useState<"combined" | "english" | "spanish">("combined");
+    const view =
+      bucket === "english"
+        ? data.casesEnglish ?? data.cases
+        : bucket === "spanish"
+          ? data.casesSpanish ?? data.cases
+          : data.cases;
+    const brokers = view.referralBrokers;
+    const tabs: Array<{ id: typeof bucket; label: string; sub: string }> = [
+      { id: "combined", label: "Combined", sub: "English + Spanish" },
+      { id: "english", label: "English", sub: "PPLT" },
+      { id: "spanish", label: "Spanish", sub: "Abogado" },
+    ];
+    return (
+      <>
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 mb-4">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setBucket(t.id)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                bucket === t.id
+                  ? "bg-blue-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {t.label}
+              <span className={`ml-1.5 text-[10px] uppercase tracking-wider ${bucket === t.id ? "text-blue-100" : "text-slate-400"}`}>
+                {t.sub}
+              </span>
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ChartCard title="By Practice Area">
-            <BarCount data={c.byPracticeArea.map((r) => ({ name: r.area, value: r.count }))} />
+            <BarCount data={view.byPracticeArea.map((r) => ({ name: r.area, value: r.count }))} />
           </ChartCard>
           <ChartCard title="By Status">
-            <BarCount data={c.byStatus.map((r) => ({ name: r.status, value: r.count }))} />
+            <BarCount data={view.byStatus.map((r) => ({ name: r.status, value: r.count }))} />
           </ChartCard>
           <ChartCard
             title="By Co-Counsel Firm"
@@ -700,13 +737,13 @@ export default function DashboardView({
               ) : null
             }
           >
-            <BarCount data={c.byCoCounsel.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
+            <BarCount data={view.byCoCounsel.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
           </ChartCard>
           <ChartCard title="By State" subtitle="State (Jurisdiction) field, top 15">
-            <BarCount data={c.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
+            <BarCount data={view.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
           </ChartCard>
         </div>
-      </section>
+      </>
     );
   }
 

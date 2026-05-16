@@ -54,6 +54,7 @@ export type Preset =
   | "this_quarter"
   | "last_quarter"
   | "ytd"
+  | "last_7_days"
   | "last_30_days"
   | "last_90_days"
   | "custom";
@@ -117,6 +118,10 @@ export function rangeFor(preset: Preset, now = new Date()): Range {
         label: "Year to Date",
       };
     }
+    case "last_7_days": {
+      const e = startOfDay(addDays(local, 1));
+      return { start: toUtc(subDays(e, 7)), end: toUtc(e), label: "Last 7 Days" };
+    }
     case "last_30_days": {
       const e = startOfDay(addDays(local, 1));
       return { start: toUtc(subDays(e, 30)), end: toUtc(e), label: "Last 30 Days" };
@@ -163,6 +168,7 @@ export const PRESETS: { value: Preset; label: string }[] = [
   { value: "this_quarter", label: "This Quarter" },
   { value: "last_quarter", label: "Last Quarter" },
   { value: "ytd", label: "Year to Date" },
+  { value: "last_7_days", label: "Last 7 Days" },
   { value: "last_30_days", label: "Last 30 Days" },
   { value: "last_90_days", label: "Last 90 Days" },
   { value: "custom", label: "Custom range" },

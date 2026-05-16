@@ -18,12 +18,12 @@ const fixture: DashboardData = {
   generatedAt: new Date().toISOString(),
   range: { label: "This Month", start: "", end: "" },
   overview: {
-    leadsMonth: { current: 412, previous: 358, pctChange: 15.1, direction: "up" },
-    leadsWeek: { current: 94, previous: 102, pctChange: -7.8, direction: "down" },
-    referralsMonth: { current: 87, previous: 71, pctChange: 22.5, direction: "up" },
-    referralsWeek: { current: 19, previous: 24, pctChange: -20.8, direction: "down" },
-    signedMonth: { current: 41, previous: 38, pctChange: 7.9, direction: "up" },
-    signedWeek: { current: 8, previous: 11, pctChange: -27.3, direction: "down" },
+    leads30: { current: 412, previous: 358, pctChange: 15.1, direction: "up" },
+    leads7: { current: 94, previous: 102, pctChange: -7.8, direction: "down" },
+    referrals30: { current: 87, previous: 71, pctChange: 22.5, direction: "up" },
+    referrals7: { current: 19, previous: 24, pctChange: -20.8, direction: "down" },
+    signed30: { current: 41, previous: 38, pctChange: 7.9, direction: "up" },
+    signed7: { current: 8, previous: 11, pctChange: -27.3, direction: "down" },
     activeTotal: 1247,
     reviews: {
       week: 6,
@@ -194,10 +194,10 @@ function intakeRow(
     callsOutbound: cOut,
     sms,
     avgPickupSeconds: 12 + Math.random() * 6,
-    referralsMonth: { current: referrals, previous: Math.max(0, referrals - 4), pctChange: 18.2, direction: "up" as const },
-    referralsWeek: { current: Math.floor(referrals / 4), previous: Math.max(0, Math.floor(referrals / 4) - 1), pctChange: 9.1, direction: "up" as const },
-    signedMonth: { current: signed, previous: Math.max(0, signed - 2), pctChange: 25.0, direction: "up" as const },
-    signedWeek: { current: Math.floor(signed / 4), previous: Math.max(0, Math.floor(signed / 4)), pctChange: 0, direction: "flat" as const },
+    referrals30: { current: referrals, previous: Math.max(0, referrals - 4), pctChange: 18.2, direction: "up" as const },
+    referrals7: { current: Math.floor(referrals / 4), previous: Math.max(0, Math.floor(referrals / 4) - 1), pctChange: 9.1, direction: "up" as const },
+    signed30: { current: signed, previous: Math.max(0, signed - 2), pctChange: 25.0, direction: "up" as const },
+    signed7: { current: Math.floor(signed / 4), previous: Math.max(0, Math.floor(signed / 4)), pctChange: 0, direction: "flat" as const },
     activeFromReferrals: active,
   };
 }

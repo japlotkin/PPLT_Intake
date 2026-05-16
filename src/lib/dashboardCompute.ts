@@ -33,12 +33,12 @@ const SECTION_TIMEOUT_MS = 120_000; // 2 minutes per section — generous since 
 function emptyOverview(): OverviewData {
   const z = { current: 0, previous: 0, pctChange: 0, direction: "flat" as const };
   return {
-    leadsMonth: z,
-    leadsWeek: z,
-    referralsMonth: z,
-    referralsWeek: z,
-    signedMonth: z,
-    signedWeek: z,
+    leads30: z,
+    leads7: z,
+    referrals30: z,
+    referrals7: z,
+    signed30: z,
+    signed7: z,
     activeTotal: 0,
     reviews: { week: 0, month: 0, year: 0, lifetime: 0, perProfile: [] },
   };
@@ -114,51 +114,62 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     warnings.push(`Opportunities fetch issue: ${msg.slice(0, 200)} (some sections may be empty)`);
   }
 
-  const [overviewData, kpi, leadsSpanish, leadsEnglish, intakeTeam, cases, email] =
-    await Promise.all([
-      settled<OverviewData>("Overview", () => overview(), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
-      settled<{ months: KpiBlock[]; quarters: KpiBlock[] }>(
-        "KPI table",
-        () => kpiTable(),
-        { months: [], quarters: [] },
-        warnings,
-        SECTION_TIMEOUT_MS,
-        log
-      ),
-      settled<LeadAnalytics>(
-        "Spanish lead analytics",
-        () => leadAnalyticsForBucket("spanish", range.start, range.end),
-        emptyLead(),
-        warnings,
-        SECTION_TIMEOUT_MS,
-        log
-      ),
-      settled<LeadAnalytics>(
-        "English lead analytics",
-        () => leadAnalyticsForBucket("english", range.start, range.end),
-        emptyLead(),
-        warnings,
-        SECTION_TIMEOUT_MS,
-        log
-      ),
-      settled<IntakeMemberMetrics[]>(
-        "Intake team",
-        () => intakeTeamMetrics(range.start, range.end),
-        [],
-        warnings,
-        SECTION_TIMEOUT_MS,
-        log
-      ),
-      settled<CaseAnalytics>("Case analytics", () => caseAnalytics(), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
-      settled<EmailMetrics[]>(
-        "Email metrics",
-        () => emailMetricsByBucket(range.start, range.end),
-        [],
-        warnings,
-        SECTION_TIMEOUT_MS,
-        log
-      ),
-    ]);
+  const [
+    overviewData,
+    kpi,
+    leadsSpanish,
+    leadsEnglish,
+    intakeTeam,
+    cases,
+    casesEnglish,
+    casesSpanish,
+    email,
+  ] = await Promise.all([
+    settled<OverviewData>("Overview", () => overview(), emptyOverview(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<{ months: KpiBlock[]; quarters: KpiBlock[] }>(
+      "KPI table",
+      () => kpiTable(),
+      { months: [], quarters: [] },
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+    settled<LeadAnalytics>(
+      "Spanish lead analytics",
+      () => leadAnalyticsForBucket("spanish", range.start, range.end),
+      emptyLead(),
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+    settled<LeadAnalytics>(
+      "English lead analytics",
+      () => leadAnalyticsForBucket("english", range.start, range.end),
+      emptyLead(),
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+    settled<IntakeMemberMetrics[]>(
+      "Intake team",
+      () => intakeTeamMetrics(range.start, range.end),
+      [],
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+    settled<CaseAnalytics>("Case analytics (combined)", () => caseAnalytics("combined"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<CaseAnalytics>("Case analytics (English)", () => caseAnalytics("english"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<CaseAnalytics>("Case analytics (Spanish)", () => caseAnalytics("spanish"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<EmailMetrics[]>(
+      "Email metrics",
+      () => emailMetricsByBucket(range.start, range.end),
+      [],
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+  ]);
 
   if (overviewData.reviews.lifetime === 0 && overviewData.reviews.perProfile.length === 0) {
     warnings.push("Google review counts unavailable — GHL reputation endpoint did not return data.");
@@ -177,6 +188,8 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     leadsSpanish,
     intakeTeam,
     cases,
+    casesEnglish,
+    casesSpanish,
     warnings,
   };
 }

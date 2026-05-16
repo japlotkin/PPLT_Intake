@@ -101,39 +101,39 @@ export async function prefetchAllOpps(): Promise<PrefetchedOpps> {
 }
 
 export async function overview(now = new Date()): Promise<OverviewData> {
-  const thisMonth: Range = rangeFor("this_month", now);
-  const lastMonth: Range = rangeFor("last_month", now);
-  const thisWeek: Range = rangeFor("this_week", now);
-  const lastWeek: Range = rangeFor("last_week", now);
+  const last30: Range = rangeFor("last_30_days", now);
+  const prev30: Range = previousPeriod(last30);
+  const last7: Range = rangeFor("last_7_days", now);
+  const prev7: Range = previousPeriod(last7);
 
   const opps = await prefetchAllOpps();
 
   const [
-    leadsM,
-    leadsMPrev,
-    leadsW,
-    leadsWPrev,
-    refM,
-    refMPrev,
-    refW,
-    refWPrev,
-    sigM,
-    sigMPrev,
-    sigW,
-    sigWPrev,
+    leads30Cur,
+    leads30Prev,
+    leads7Cur,
+    leads7Prev,
+    ref30Cur,
+    ref30Prev,
+    ref7Cur,
+    ref7Prev,
+    sig30Cur,
+    sig30Prev,
+    sig7Cur,
+    sig7Prev,
   ] = await Promise.all([
-    leadsInRange(thisMonth.start, thisMonth.end),
-    leadsInRange(lastMonth.start, lastMonth.end),
-    leadsInRange(thisWeek.start, thisWeek.end),
-    leadsInRange(lastWeek.start, lastWeek.end),
-    referredOutInRange(opps.abogado, opps.pplt, thisMonth.start, thisMonth.end),
-    referredOutInRange(opps.abogado, opps.pplt, lastMonth.start, lastMonth.end),
-    referredOutInRange(opps.abogado, opps.pplt, thisWeek.start, thisWeek.end),
-    referredOutInRange(opps.abogado, opps.pplt, lastWeek.start, lastWeek.end),
-    signedInRange(opps.abogado, opps.pplt, thisMonth.start, thisMonth.end),
-    signedInRange(opps.abogado, opps.pplt, lastMonth.start, lastMonth.end),
-    signedInRange(opps.abogado, opps.pplt, thisWeek.start, thisWeek.end),
-    signedInRange(opps.abogado, opps.pplt, lastWeek.start, lastWeek.end),
+    leadsInRange(last30.start, last30.end),
+    leadsInRange(prev30.start, prev30.end),
+    leadsInRange(last7.start, last7.end),
+    leadsInRange(prev7.start, prev7.end),
+    referredOutInRange(opps.abogado, opps.pplt, last30.start, last30.end),
+    referredOutInRange(opps.abogado, opps.pplt, prev30.start, prev30.end),
+    referredOutInRange(opps.abogado, opps.pplt, last7.start, last7.end),
+    referredOutInRange(opps.abogado, opps.pplt, prev7.start, prev7.end),
+    signedInRange(opps.abogado, opps.pplt, last30.start, last30.end),
+    signedInRange(opps.abogado, opps.pplt, prev30.start, prev30.end),
+    signedInRange(opps.abogado, opps.pplt, last7.start, last7.end),
+    signedInRange(opps.abogado, opps.pplt, prev7.start, prev7.end),
   ]);
 
   // Reviews fetched separately with a hard 15s budget so a slow GHL
@@ -148,12 +148,12 @@ export async function overview(now = new Date()): Promise<OverviewData> {
     activeNow(opps.abogado).length + activeNow(opps.pplt).length;
 
   return {
-    leadsMonth: delta(leadsM, leadsMPrev),
-    leadsWeek: delta(leadsW, leadsWPrev),
-    referralsMonth: delta(refM, refMPrev),
-    referralsWeek: delta(refW, refWPrev),
-    signedMonth: delta(sigM, sigMPrev),
-    signedWeek: delta(sigW, sigWPrev),
+    leads30: delta(leads30Cur, leads30Prev),
+    leads7: delta(leads7Cur, leads7Prev),
+    referrals30: delta(ref30Cur, ref30Prev),
+    referrals7: delta(ref7Cur, ref7Prev),
+    signed30: delta(sig30Cur, sig30Prev),
+    signed7: delta(sig7Cur, sig7Prev),
     activeTotal,
     reviews: reviewBlock ?? {
       week: 0,
