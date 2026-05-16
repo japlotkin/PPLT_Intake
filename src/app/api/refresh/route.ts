@@ -1,14 +1,14 @@
 /**
  * POST /api/refresh — admin-only manual sync trigger.
  *
- * Calls computeDashboardData() inline and writes a fresh snapshot. Returns
- * 200 only after the sync completes, so the dashboard's Refresh button can
- * show "Refreshed in 47s" or similar.
+ * Runs computeDashboardData for every preset and writes per-preset
+ * snapshots. Returns 200 after all snapshots are written so the
+ * dashboard's Refresh button can show "Refreshed in 47s".
  */
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { computeDashboardData } from "@/lib/dashboardCompute";
-import { writeSnapshot } from "@/lib/snapshotStore";
+import { writeSnapshot, SYNCED_PRESETS } from "@/lib/snapshotStore";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -27,19 +27,24 @@ export async function POST() {
   }
 
   const t0 = Date.now();
+  let totalWarnings = 0;
   try {
-    const data = await computeDashboardData();
-    const durationMs = Date.now() - t0;
-    await writeSnapshot({
-      data,
-      syncedAt: new Date().toISOString(),
-      durationMs,
-    });
+    for (const preset of SYNCED_PRESETS) {
+      const pT0 = Date.now();
+      const data = await computeDashboardData({ preset });
+      totalWarnings += data.warnings.length;
+      await writeSnapshot(preset, {
+        data,
+        syncedAt: new Date().toISOString(),
+        durationMs: Date.now() - pT0,
+      });
+    }
     return NextResponse.json({
       ok: true,
-      durationMs,
+      durationMs: Date.now() - t0,
       syncedAt: new Date().toISOString(),
-      warnings: data.warnings,
+      presetsSynced: SYNCED_PRESETS.length,
+      totalWarnings,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

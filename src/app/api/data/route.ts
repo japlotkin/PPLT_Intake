@@ -1,12 +1,11 @@
 /**
- * GET /api/data
+ * GET /api/data?preset=this_month
  *
- * Read-only endpoint. Returns the latest snapshot from KV. The actual
- * GHL/Meta walking happens in /api/sync (cron-scheduled).
+ * Reads the snapshot for the requested preset from KV. The sync route
+ * pre-computes snapshots for every preset in SYNCED_PRESETS.
  *
- * If no snapshot exists yet (just provisioned KV, never synced), returns
- * 503 with a `needsSync: true` payload so the dashboard UI can show a
- * "Run sync" call to action.
+ * If the requested preset isn't pre-computed (or no snapshots exist),
+ * readSnapshot falls back to "this_month".
  */
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
@@ -15,13 +14,16 @@ import { readSnapshot } from "@/lib/snapshotStore";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const envelope = await readSnapshot();
+  const url = new URL(req.url);
+  const preset = url.searchParams.get("preset") || "this_month";
+
+  const envelope = await readSnapshot(preset);
   if (!envelope) {
     return NextResponse.json(
       {

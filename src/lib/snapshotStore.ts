@@ -1,14 +1,13 @@
 /**
  * Persistent snapshot store for the dashboard payload.
  *
- * Reads/writes a single key in Vercel KV (or any KV-compatible store
- * connected via KV_REST_API_URL / KV_REST_API_TOKEN). The dashboard page
- * loads this snapshot in ~50ms instead of walking GHL/Meta live.
+ * One snapshot per date-range preset. Range-independent sections
+ * (Overview, KPI, Cases) are still recomputed for each preset but only
+ * hit GHL once thanks to the per-process memo on streamOpportunities
+ * and streamContacts -- so storing multiple snapshots costs storage,
+ * not many extra API calls.
  *
- * Dev fallback (when KV envs are absent AND we're NOT on Vercel) writes
- * to disk so local testing works. On Vercel we refuse to write to disk
- * (the filesystem is read-only outside /tmp, and /tmp is per-invocation
- * so a snapshot written there is invisible to the next request).
+ * The dashboard reads the snapshot matching the user's date picker.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -17,12 +16,29 @@ import { kv } from "@vercel/kv";
 import { env } from "./env";
 import type { DashboardData } from "./types";
 
-const SNAPSHOT_KEY = "dash:snapshot:current";
+const SNAPSHOT_PREFIX = "dash:snapshot:v3:";
 const SNAPSHOT_TTL_SECONDS = 25 * 60 * 60; // 25 hours
 
-// Dev fallback file -- put it in tmpdir so it doesn't end up in the repo
-// or in Vercel's read-only /var/task.
-const DEV_SNAPSHOT_PATH = path.join(os.tmpdir(), "pplt-intake-snapshot.json");
+function keyFor(preset: string): string {
+  return `${SNAPSHOT_PREFIX}${preset}`;
+}
+function devPath(preset: string): string {
+  return path.join(os.tmpdir(), `pplt-intake-snapshot-${preset}.json`);
+}
+
+/** Presets the sync pre-computes and stores. The date picker can pick any of these. */
+export const SYNCED_PRESETS = [
+  "this_month",
+  "last_month",
+  "this_week",
+  "last_week",
+  "last_7_days",
+  "last_30_days",
+  "this_quarter",
+  "last_quarter",
+] as const;
+
+export type SyncedPreset = (typeof SYNCED_PRESETS)[number];
 
 const IS_VERCEL = Boolean(process.env.VERCEL);
 
@@ -44,43 +60,53 @@ export interface SnapshotEnvelope {
   durationMs: number;
 }
 
-export async function readSnapshot(): Promise<SnapshotEnvelope | null> {
+export async function readSnapshot(preset: string): Promise<SnapshotEnvelope | null> {
   if (env.kv.enabled()) {
-    return ((await kv.get<SnapshotEnvelope>(SNAPSHOT_KEY)) ?? null);
-  }
-  if (IS_VERCEL) {
-    // No KV on Vercel = no shared storage. Treat as "no snapshot" so the
-    // UI shows the needs-sync CTA; the sync itself will throw with a
-    // clearer error when the user clicks Refresh.
+    const v = await kv.get<SnapshotEnvelope>(keyFor(preset));
+    if (v) return v;
+    // Fallback: if the requested preset isn't pre-synced, try the default.
+    if (preset !== "this_month") {
+      return ((await kv.get<SnapshotEnvelope>(keyFor("this_month"))) ?? null);
+    }
     return null;
   }
+  if (IS_VERCEL) return null;
   try {
-    const raw = await fs.readFile(DEV_SNAPSHOT_PATH, "utf-8");
+    const raw = await fs.readFile(devPath(preset), "utf-8");
     return JSON.parse(raw) as SnapshotEnvelope;
   } catch {
-    return null;
+    try {
+      const raw = await fs.readFile(devPath("this_month"), "utf-8");
+      return JSON.parse(raw) as SnapshotEnvelope;
+    } catch {
+      return null;
+    }
   }
 }
 
-export async function writeSnapshot(envelope: SnapshotEnvelope): Promise<void> {
+export async function writeSnapshot(preset: string, envelope: SnapshotEnvelope): Promise<void> {
   if (env.kv.enabled()) {
-    await kv.set(SNAPSHOT_KEY, envelope, { ex: SNAPSHOT_TTL_SECONDS });
+    await kv.set(keyFor(preset), envelope, { ex: SNAPSHOT_TTL_SECONDS });
     return;
   }
   if (IS_VERCEL) {
     throw new SnapshotStoreNotConfiguredError();
   }
-  await fs.writeFile(DEV_SNAPSHOT_PATH, JSON.stringify(envelope, null, 2), "utf-8");
+  await fs.writeFile(devPath(preset), JSON.stringify(envelope, null, 2), "utf-8");
 }
 
-export async function deleteSnapshot(): Promise<void> {
+export async function deleteAllSnapshots(): Promise<void> {
   if (env.kv.enabled()) {
-    await kv.del(SNAPSHOT_KEY);
+    for (const p of SYNCED_PRESETS) {
+      await kv.del(keyFor(p));
+    }
     return;
   }
-  try {
-    await fs.unlink(DEV_SNAPSHOT_PATH);
-  } catch {
-    /* ok */
+  for (const p of SYNCED_PRESETS) {
+    try {
+      await fs.unlink(devPath(p));
+    } catch {
+      /* ok */
+    }
   }
 }
