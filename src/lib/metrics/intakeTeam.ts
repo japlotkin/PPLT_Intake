@@ -74,10 +74,13 @@ function referralsForUser(
   return { referrals, signedFromReferrals, activeFromReferrals };
 }
 
+export type IntakeBucket = "combined" | "english" | "spanish";
+
 export async function intakeTeamMetrics(
   start: Date,
   end: Date,
-  now = new Date()
+  now: Date = new Date(),
+  bucket: IntakeBucket = "combined"
 ): Promise<IntakeMemberMetrics[]> {
   const authA = authAbogado();
   const authP = authPplt();
@@ -118,9 +121,14 @@ export async function intakeTeamMetrics(
 
   const out: IntakeMemberMetrics[] = [];
 
+  // Bucket filter: pass undefined location ID so its branch in
+  // sumRangeStats / call/SMS lookups returns zeros.
+  const useAbogado = bucket !== "english";
+  const usePplt = bucket !== "spanish";
+
   for (const [, slot] of seen) {
-    const aId = slot.idsByLoc.abogado;
-    const pId = slot.idsByLoc.pplt_leads;
+    const aId = useAbogado ? slot.idsByLoc.abogado : undefined;
+    const pId = usePplt ? slot.idsByLoc.pplt_leads : undefined;
 
     const rangeStats = sumRangeStats(oppsA, oppsP, aId, pId, start, end);
     const cur30 = sumRangeStats(oppsA, oppsP, aId, pId, last30.start, last30.end);

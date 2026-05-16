@@ -12,7 +12,9 @@ import {
   Sparkles,
   DollarSign,
   Target,
+  Download,
 } from "lucide-react";
+import { downloadCsv } from "@/lib/csv";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DeltaPill } from "@/components/DeltaPill";
 import { EmptyState } from "@/components/EmptyState";
@@ -90,6 +92,26 @@ function SectionNav() {
         ))}
       </div>
     </aside>
+  );
+}
+
+function ExportCsvButton({
+  onClick,
+  label = "Export CSV",
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50 transition"
+      title={label}
+    >
+      <Download className="h-3.5 w-3.5" />
+      {label}
+    </button>
   );
 }
 
@@ -457,26 +479,113 @@ export default function DashboardView({
         </div>
 
         <div className="mt-6">
-          <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
-            By Practice Area
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+              By Practice Area
+            </h3>
+            <ExportCsvButton
+              onClick={() =>
+                downloadCsv(
+                  "ad-cost-by-practice-area",
+                  [
+                    { header: "Practice area", get: (r) => r.area },
+                    { header: "Ads", get: (r) => r.adCount },
+                    { header: "Spend ($)", get: (r) => Math.round(r.spend) },
+                    { header: "Leads (Meta)", get: (r) => r.leadsMeta },
+                    { header: "Signed", get: (r) => r.signed },
+                    { header: "CPL ($)", get: (r) => (r.cpl === null ? "" : Math.round(r.cpl)) },
+                    { header: "CPSC ($)", get: (r) => (r.cpsc === null ? "" : Math.round(r.cpsc)) },
+                  ],
+                  c.byPracticeArea
+                )
+              }
+            />
+          </div>
           <PracticeAreaCostTable rows={c.byPracticeArea} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
 
         <div className="mt-6">
-          <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3 flex items-center gap-2">
-            By Area × State
-            <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">
-              · state from contact's State (Jurisdiction); spend attributed via $/Meta-lead
-            </span>
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-2">
+              By Area × State
+              <span className="text-[10px] font-normal normal-case tracking-normal text-slate-400">
+                · state from contact's State (Jurisdiction); spend attributed via $/Meta-lead
+              </span>
+            </h3>
+            <ExportCsvButton
+              onClick={() =>
+                downloadCsv(
+                  "ad-cost-by-area-state",
+                  [
+                    { header: "Area", get: (r) => r.area },
+                    { header: "State", get: (r) => r.state },
+                    { header: "Spend ($)", get: (r) => Math.round(r.spend) },
+                    { header: "Leads", get: (r) => r.leads },
+                    { header: "Signed", get: (r) => r.signed },
+                    { header: "Referred", get: (r) => r.referred },
+                    { header: "CPL ($)", get: (r) => (r.cpl === null ? "" : Math.round(r.cpl)) },
+                    { header: "CPSC ($)", get: (r) => (r.cpsc === null ? "" : Math.round(r.cpsc)) },
+                  ],
+                  c.byAreaState ?? []
+                )
+              }
+            />
+          </div>
           <AreaStateCostTable rows={c.byAreaState ?? []} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
 
         <div className="mt-6">
-          <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
-            Per Ad · top 40 by spend
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+              Per Ad · top 40 by spend
+            </h3>
+            <div className="flex items-center gap-2">
+              <ExportCsvButton
+                label="Top 40"
+                onClick={() =>
+                  downloadCsv(
+                    "ad-cost-per-ad-top40",
+                    [
+                      { header: "Ad", get: (r) => r.adName },
+                      { header: "Campaign", get: (r) => r.campaignName },
+                      { header: "Ad set", get: (r) => r.adsetName },
+                      { header: "Account", get: (r) => r.account },
+                      { header: "Practice area", get: (r) => r.practiceArea },
+                      { header: "Spend ($)", get: (r) => Math.round(r.spend) },
+                      { header: "Leads (Meta)", get: (r) => r.leadsMeta },
+                      { header: "Signed", get: (r) => r.signed },
+                      { header: "CPL ($)", get: (r) => (r.cpl === null ? "" : Math.round(r.cpl)) },
+                      { header: "CPSC ($)", get: (r) => (r.cpsc === null ? "" : Math.round(r.cpsc)) },
+                      { header: "Ad ID", get: (r) => r.adId },
+                    ],
+                    c.byAd.slice(0, 40)
+                  )
+                }
+              />
+              <ExportCsvButton
+                label={`All ${c.byAd.length}`}
+                onClick={() =>
+                  downloadCsv(
+                    "ad-cost-per-ad-all",
+                    [
+                      { header: "Ad", get: (r) => r.adName },
+                      { header: "Campaign", get: (r) => r.campaignName },
+                      { header: "Ad set", get: (r) => r.adsetName },
+                      { header: "Account", get: (r) => r.account },
+                      { header: "Practice area", get: (r) => r.practiceArea },
+                      { header: "Spend ($)", get: (r) => Math.round(r.spend) },
+                      { header: "Leads (Meta)", get: (r) => r.leadsMeta },
+                      { header: "Signed", get: (r) => r.signed },
+                      { header: "CPL ($)", get: (r) => (r.cpl === null ? "" : Math.round(r.cpl)) },
+                      { header: "CPSC ($)", get: (r) => (r.cpsc === null ? "" : Math.round(r.cpsc)) },
+                      { header: "Ad ID", get: (r) => r.adId },
+                    ],
+                    c.byAd
+                  )
+                }
+              />
+            </div>
+          </div>
           <AdCostTable rows={c.byAd.slice(0, 40)} fmtUsd={fmtUsd} fmtUsd2={fmtUsd2} />
         </div>
       </section>
@@ -746,8 +855,44 @@ export default function DashboardView({
   }
 
   function IntakeTeamBlock({ data }: { data: DashboardData }) {
+    const [bucket, setBucket] = useState<"combined" | "english" | "spanish">("combined");
+    const rows =
+      bucket === "english"
+        ? data.intakeTeamEnglish ?? data.intakeTeam ?? []
+        : bucket === "spanish"
+          ? data.intakeTeamSpanish ?? data.intakeTeam ?? []
+          : data.intakeTeam ?? [];
+    const tabs: Array<{ id: typeof bucket; label: string; sub: string }> = [
+      { id: "combined", label: "Combined", sub: "English + Spanish" },
+      { id: "english", label: "English", sub: "PPLT" },
+      { id: "spanish", label: "Spanish", sub: "Abogado" },
+    ];
     return (
-      <IntakeTeamTable rows={data.intakeTeam ?? []} />
+      <section id="intake">
+        <SectionHeader
+          title="Intake Team"
+          subtitle="Per-member referrals, calls, SMS, and trends · click any column to sort"
+        />
+        <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1 mb-4">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setBucket(t.id)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                bucket === t.id
+                  ? "bg-blue-600 text-white shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {t.label}
+              <span className={`ml-1.5 text-[10px] uppercase tracking-wider ${bucket === t.id ? "text-blue-100" : "text-slate-400"}`}>
+                {t.sub}
+              </span>
+            </button>
+          ))}
+        </div>
+        <IntakeTeamTable rows={rows} />
+      </section>
     );
   }
 
@@ -791,20 +936,11 @@ export default function DashboardView({
     );
 
     if (!rows || rows.length === 0) {
-      return (
-        <section id="intake">
-          <SectionHeader title="Intake Team" />
-          <EmptyState />
-        </section>
-      );
+      return <EmptyState />;
     }
 
     return (
-      <section id="intake">
-        <SectionHeader
-          title="Intake Team"
-          subtitle="Per-member referrals, calls, SMS, and trends · click any column to sort"
-        />
+      <>
         <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
           <table className="w-full text-sm min-w-[1100px]">
             <thead className="bg-slate-50/60">
@@ -863,7 +999,7 @@ export default function DashboardView({
         <p className="text-[11px] text-slate-400 mt-2">
           Avg call shows mean duration of answered calls in the current range (proxy for pickup time).
         </p>
-      </section>
+      </>
     );
   }
 

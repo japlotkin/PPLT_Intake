@@ -252,7 +252,9 @@ export interface DashboardData {
   email: EmailMetrics[];
   leadsEnglish: LeadAnalytics;
   leadsSpanish: LeadAnalytics;
-  intakeTeam: IntakeMemberMetrics[];
+  intakeTeam: IntakeMemberMetrics[]; // combined view
+  intakeTeamEnglish?: IntakeMemberMetrics[]; // PPLT-only activity per member
+  intakeTeamSpanish?: IntakeMemberMetrics[]; // Abogado-only activity per member
   cases: CaseAnalytics; // combined view (English + Spanish)
   casesEnglish?: CaseAnalytics; // PPLT-only
   casesSpanish?: CaseAnalytics; // Abogado-only

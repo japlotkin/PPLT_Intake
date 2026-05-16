@@ -120,6 +120,8 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     leadsSpanish,
     leadsEnglish,
     intakeTeam,
+    intakeTeamEnglish,
+    intakeTeamSpanish,
     cases,
     casesEnglish,
     casesSpanish,
@@ -151,8 +153,24 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
       log
     ),
     settled<IntakeMemberMetrics[]>(
-      "Intake team",
-      () => intakeTeamMetrics(range.start, range.end),
+      "Intake team (combined)",
+      () => intakeTeamMetrics(range.start, range.end, new Date(), "combined"),
+      [],
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+    settled<IntakeMemberMetrics[]>(
+      "Intake team (English)",
+      () => intakeTeamMetrics(range.start, range.end, new Date(), "english"),
+      [],
+      warnings,
+      SECTION_TIMEOUT_MS,
+      log
+    ),
+    settled<IntakeMemberMetrics[]>(
+      "Intake team (Spanish)",
+      () => intakeTeamMetrics(range.start, range.end, new Date(), "spanish"),
       [],
       warnings,
       SECTION_TIMEOUT_MS,
@@ -190,6 +208,8 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     leadsEnglish,
     leadsSpanish,
     intakeTeam,
+    intakeTeamEnglish,
+    intakeTeamSpanish,
     cases,
     casesEnglish,
     casesSpanish,
