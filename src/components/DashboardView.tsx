@@ -450,7 +450,7 @@ export default function DashboardView({
               <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
                 By Month
               </h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {data.kpi.months.map((b) => (
                   <KpiTable key={b.title} block={b} />
                 ))}
