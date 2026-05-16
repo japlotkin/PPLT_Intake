@@ -413,7 +413,9 @@ export default function DashboardView({
     const fmtUsd = (n: number) =>
       `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
     const fmtUsd2 = (n: number | null) =>
-      n === null ? "—" : `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+      n === null
+        ? "—"
+        : `$${Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
     return (
       <section id="cost">
         <SectionHeader
