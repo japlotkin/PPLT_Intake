@@ -212,12 +212,24 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     }
   }
 
+  // Surface the intake-cron sync timestamps so the UI can show
+  // "last synced X ago" or "cron hasn't run yet" inside the Intake
+  // Team section banner.
+  const { readIntakeConversations: readIntake } = await import(
+    "./intakeConversationsStore"
+  );
+  const [intakeAbg, intakePplt] = await Promise.all([
+    readIntake("abogado").then((s) => s?.syncedAt ?? null).catch(() => null),
+    readIntake("pplt_leads").then((s) => s?.syncedAt ?? null).catch(() => null),
+  ]);
+
   return {
     generatedAt: new Date().toISOString(),
     range: { label: range.label, start: range.start.toISOString(), end: range.end.toISOString() },
     overview: overviewData,
     overviewEnglish: overviewEnglishData,
     overviewSpanish: overviewSpanishData,
+    intakeSyncedAt: { abogado: intakeAbg, pplt_leads: intakePplt },
     kpi,
     email: [], // deprecated; UI no longer renders this section
     leadsEnglish,

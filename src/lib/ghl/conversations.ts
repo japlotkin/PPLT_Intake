@@ -211,7 +211,11 @@ export async function conversationsActivityByDay(
         const direction: "inbound" | "outbound" | null =
           m.direction === "inbound" ? "inbound" : m.direction ? "outbound" : null;
         const isCall = m.messageType === "TYPE_CALL";
-        const isSms = m.messageType === "TYPE_SMS";
+        // TYPE_SMS = native SMS. TYPE_CUSTOM_SMS = messages from a
+        // saved template; PPLT sends almost everything via templates,
+        // so missing this type drops 90% of their SMS activity.
+        const isSms =
+          m.messageType === "TYPE_SMS" || m.messageType === "TYPE_CUSTOM_SMS";
         if (isCall) {
           if (!m.userId) {
             unassignedCalls++;

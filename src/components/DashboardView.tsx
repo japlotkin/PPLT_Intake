@@ -1246,8 +1246,18 @@ export default function DashboardView({
           ? data.intakeTeamSpanish ?? data.intakeTeam ?? []
           : data.intakeTeam ?? [];
     const dyn = sectionWarnings(data, ["Intake team"]);
+    const syncedAbg = data.intakeSyncedAt?.abogado;
+    const syncedPplt = data.intakeSyncedAt?.pplt_leads;
+    const syncStatus = (() => {
+      if (!syncedAbg && !syncedPplt) {
+        return "Intake conversation cron (/api/sync/intake) has not run yet — every column will be zero until it does. First fire is up to 4 hours from deploy. Admin can force-trigger by POSTing /api/sync/intake.";
+      }
+      const fmt = (s: string | null | undefined) =>
+        s ? `synced ${timeAgo(s)}` : "not yet";
+      return `Intake conversation cron: PPLT ${fmt(syncedPplt)}, Abogado ${fmt(syncedAbg)}.`;
+    })();
     const info: string[] = [
-      "All columns come from the 4-hourly /api/sync/intake cron (GHL conversation + message walk). If everything shows zeros the cron hasn't run yet (first tick after deploy can take up to 4 hours).",
+      syncStatus,
       "Referrals / Signed attribution: the rep who initiated the action gets credit, defined as the intake user who sent the most recent outbound call/SMS to that contact in the 14 days BEFORE the opp's stage flipped to referred / signed. opp.assignedTo is ignored — this firm's GHL setup doesn't populate it reliably.",
     ];
     return (

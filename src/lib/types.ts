@@ -303,6 +303,9 @@ export interface DashboardData {
   // mock-data endpoint doesn't set these.
   syncedAt?: string;
   syncDurationMs?: number;
+  /** When /api/sync/intake last wrote its KV snapshot (per-bucket).
+   *  Helps surface "intake cron hasn't run yet" vs "cron ran, found 0". */
+  intakeSyncedAt?: { abogado: string | null; pplt_leads: string | null };
   // Per-user visibility (resolved at request time from current Clerk user)
   visibility?: {
     sections: Record<string, boolean>;
