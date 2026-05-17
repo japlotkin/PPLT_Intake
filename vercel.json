@@ -3,10 +3,15 @@
     {
       "path": "/api/sync",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/sync/intake",
+      "schedule": "15 */4 * * *"
     }
   ],
   "functions": {
     "src/app/api/sync/route.ts": { "maxDuration": 300 },
+    "src/app/api/sync/intake/route.ts": { "maxDuration": 300 },
     "src/app/api/refresh/route.ts": { "maxDuration": 300 }
   }
 }

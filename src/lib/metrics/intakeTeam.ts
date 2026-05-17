@@ -12,7 +12,6 @@
  *   - Total currently active cases from their referrals
  */
 import { authAbogado, authPplt } from "../ghl/client";
-import { conversationsActivity, type ConversationActivity } from "../ghl/conversations";
 import {
   classifyOpportunities,
   streamOpportunities,
@@ -20,15 +19,11 @@ import {
 import { intakeUsers, getLocation } from "../mapping";
 import { rangeFor, previousPeriod } from "../dateRanges";
 import { delta } from "./helpers";
+import {
+  readIntakeConversations,
+  sumActivityForWindow,
+} from "../intakeConversationsStore";
 import type { IntakeMemberMetrics } from "../types";
-
-// Conversation walk is hundreds of GHL requests per location (every
-// conversation with recent activity, then every message in each). It
-// blows past the section timeout on busy weeks. For v1 we skip it and
-// show 0 for calls/SMS; referral and signed counts (from memoized opps)
-// still populate. Re-enable once we have a dedicated longer-running
-// cron for /api/sync/intake-conversations.
-const FETCH_CONVERSATIONS = false;
 
 interface ReferralSummary {
   referrals: number;
@@ -84,16 +79,11 @@ export async function intakeTeamMetrics(
 ): Promise<IntakeMemberMetrics[]> {
   const authA = authAbogado();
   const authP = authPplt();
-  const empty: ConversationActivity = {
-    callsByUser: new Map(),
-    smsByUser: new Map(),
-    callsUnassigned: 0,
-  };
   const [oppsA, oppsP, convA, convP] = await Promise.all([
     streamOpportunities(authA).then((r) => classifyOpportunities(authA, r)),
     streamOpportunities(authP).then((r) => classifyOpportunities(authP, r)),
-    FETCH_CONVERSATIONS ? conversationsActivity(authA, start, end) : Promise.resolve(empty),
-    FETCH_CONVERSATIONS ? conversationsActivity(authP, start, end) : Promise.resolve(empty),
+    readIntakeConversations("abogado"),
+    readIntakeConversations("pplt_leads"),
   ]);
 
   const intakeA = intakeUsers(getLocation("abogado"));
@@ -136,15 +126,19 @@ export async function intakeTeamMetrics(
     const cur7 = sumRangeStats(oppsA, oppsP, aId, pId, last7.start, last7.end);
     const prev7Stats = sumRangeStats(oppsA, oppsP, aId, pId, prev7.start, prev7.end);
 
-    const cA = aId ? convA.callsByUser.get(aId) : undefined;
-    const cP = pId ? convP.callsByUser.get(pId) : undefined;
-    const sA = aId ? convA.smsByUser.get(aId) : undefined;
-    const sP = pId ? convP.smsByUser.get(pId) : undefined;
-    const inbound = (cA?.inbound ?? 0) + (cP?.inbound ?? 0);
-    const outbound = (cA?.outbound ?? 0) + (cP?.outbound ?? 0);
-    const answered = (cA?.answered ?? 0) + (cP?.answered ?? 0);
-    const durSec = (cA?.durationSeconds ?? 0) + (cP?.durationSeconds ?? 0);
-    const sms = (sA?.inbound ?? 0) + (sA?.outbound ?? 0) + (sP?.inbound ?? 0) + (sP?.outbound ?? 0);
+    // Calls / SMS come from the KV snapshot written by /api/sync/intake.
+    // Sum the daily buckets falling inside [start, end). NULL snapshot
+    // means the intake cron hasn't run yet — the section will show
+    // zeros and the data-verification banner above the table flags it.
+    const aActivity = aId ? convA?.byUser[aId] : undefined;
+    const pActivity = pId ? convP?.byUser[pId] : undefined;
+    const aSum = sumActivityForWindow(aActivity, start.getTime(), end.getTime());
+    const pSum = sumActivityForWindow(pActivity, start.getTime(), end.getTime());
+    const inbound = aSum.callsInbound + pSum.callsInbound;
+    const outbound = aSum.callsOutbound + pSum.callsOutbound;
+    const answered = aSum.callsAnswered + pSum.callsAnswered;
+    const durSec = aSum.durationSeconds + pSum.durationSeconds;
+    const sms = aSum.sms + pSum.sms;
     const avgPickupSeconds = answered === 0 ? null : durSec / answered;
 
     out.push({

@@ -21,7 +21,7 @@ const isDemoRoute = createRouteMatcher(["/demo", "/api/mock-data"]);
 // /api/sync is auth'd by CRON_SECRET (Vercel Cron) or admin Clerk session
 // inside the route handler. Vercel Cron sends no cookies, so the gate
 // would block it -- skip the gate for this path.
-const isCronRoute = createRouteMatcher(["/api/sync"]);
+const isCronRoute = createRouteMatcher(["/api/sync", "/api/sync/intake"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isGateRoute(req) || isDemoRoute(req) || isCronRoute(req)) {

@@ -65,6 +65,13 @@ function todayISO() {
   return d.toISOString().slice(0, 10);
 }
 
+function fmtSeconds(secs: number | null): string {
+  if (secs === null || !Number.isFinite(secs)) return "—";
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
 /**
  * Find dynamic compute warnings for a section. dashboardCompute prefixes
  * each warning with the section label (e.g. "Cost analytics: ..."). This
@@ -1207,7 +1214,7 @@ export default function DashboardView({
           : data.intakeTeam ?? [];
     const dyn = sectionWarnings(data, ["Intake team"]);
     const info: string[] = [
-      "Calls In / Calls Out / SMS / Avg Pickup columns are hidden — the conversation walk that powers them needs its own cron (Round 2). 'Referrals' here is opps assigned to the user that entered a co-counsel / referral / broker stage; if a teammate handed off, only the latest assignedTo is recorded.",
+      "Calls In / Calls Out / SMS / Avg Call now powered by a separate 4-hourly conversation-walk cron (/api/sync/intake). If those columns all show zeros the cron hasn't run yet or KV is empty. 'Referrals' here is opps assigned to the user that entered a co-counsel / referral / broker stage; if a teammate handed off, only the latest assignedTo is recorded.",
     ];
     return (
       <section id="intake">
@@ -1227,6 +1234,10 @@ export default function DashboardView({
       | "name"
       | "referrals"
       | "signedFromReferrals"
+      | "callsInbound"
+      | "callsOutbound"
+      | "sms"
+      | "avgPickupSeconds"
       | "referrals30"
       | "referrals7"
       | "signed30"
@@ -1249,6 +1260,8 @@ export default function DashboardView({
             return r.signed30.current;
           case "signed7":
             return r.signed7.current;
+          case "avgPickupSeconds":
+            return r.avgPickupSeconds ?? null;
           default:
             return r[k] as number;
         }
@@ -1262,12 +1275,16 @@ export default function DashboardView({
     return (
       <>
         <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead className="bg-slate-50/60">
               <tr className="border-b border-slate-200">
                 <SortHeader label="Member" columnKey="name" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
                 <SortHeader label="Referrals" columnKey="referrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Signed" columnKey="signedFromReferrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Calls In" columnKey="callsInbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Calls Out" columnKey="callsOutbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="SMS" columnKey="sms" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Avg call" columnKey="avgPickupSeconds" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Ref 30d" columnKey="referrals30" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Ref 7d" columnKey="referrals7" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Signed 30d" columnKey="signed30" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
@@ -1294,6 +1311,12 @@ export default function DashboardView({
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{m.referrals}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{m.signedFromReferrals}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.callsInbound}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.callsOutbound}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.sms}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">
+                    {fmtSeconds(m.avgPickupSeconds)}
+                  </td>
                   <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.referrals30} /></td>
                   <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.referrals7} /></td>
                   <td className="px-4 py-2.5 text-right"><DeltaPill stat={m.signed30} /></td>
@@ -1306,6 +1329,9 @@ export default function DashboardView({
             </tbody>
           </table>
         </div>
+        <p className="text-[11px] text-slate-400 mt-2">
+          Avg call shows mean duration of answered calls in the current range (proxy for pickup time). Calls + SMS are sourced from a separate 4-hourly cron (/api/sync/intake) — lag of up to 4 hours is expected.
+        </p>
       </>
     );
   }
