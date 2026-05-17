@@ -912,7 +912,11 @@ export default function DashboardView({
       "desc",
       (r, k) => r[k] as string | number | null
     );
+    const [expanded, setExpanded] = useState(false);
+    const visible = expanded ? sorted : sorted.slice(0, 10);
+    const hiddenCount = sorted.length - visible.length;
     return (
+      <>
       <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
         <table className="w-full text-sm min-w-[1300px]">
           <thead className="bg-slate-50/60">
@@ -938,7 +942,7 @@ export default function DashboardView({
                   No (area × state) buckets in this window. Most likely the contacts coming from these ads don&apos;t have State (Jurisdiction) populated.
                 </td>
               </tr>
-            ) : sorted.map((r, i) => (
+            ) : visible.map((r, i) => (
               <tr key={`${r.area}-${r.state}-${i}`} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
                 <td className="px-5 py-2.5 font-medium text-slate-800">{r.area}</td>
                 <td className="px-5 py-2.5 text-slate-700">{r.state}</td>
@@ -957,6 +961,18 @@ export default function DashboardView({
           </tbody>
         </table>
       </div>
+      {sorted.length > 10 && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((s) => !s)}
+            className="text-xs text-blue-700 hover:text-blue-900 font-medium px-3 py-1.5 rounded-md hover:bg-blue-50 transition-colors"
+          >
+            {expanded ? `Show top 10 only` : `Show all ${sorted.length} rows (${hiddenCount} more)`}
+          </button>
+        </div>
+      )}
+      </>
     );
   }
 
@@ -1032,6 +1048,7 @@ export default function DashboardView({
     fmtUsd: (n: number) => string;
     fmtUsd2: (n: number | null) => string;
   }) {
+    const [expanded, setExpanded] = useState(false);
     type Col =
       | "adName" | "campaignName" | "account" | "practiceArea"
       | "spend" | "leadsMeta" | "signed" | "referred" | "signedCohort"
@@ -1043,7 +1060,10 @@ export default function DashboardView({
       "desc",
       (r, k) => r[k] as string | number | null
     );
+    const visible = expanded ? sorted : sorted.slice(0, 10);
+    const hiddenCount = sorted.length - visible.length;
     return (
+      <>
       <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
         <table className="w-full text-sm min-w-[1500px]">
           <thead className="bg-slate-50/60">
@@ -1067,7 +1087,7 @@ export default function DashboardView({
           <tbody>
             {sorted.length === 0 ? (
               <tr><td colSpan={14} className="px-4 py-6 text-center text-slate-400 text-sm">No ads with spend in this window.</td></tr>
-            ) : sorted.map((r, i) => (
+            ) : visible.map((r, i) => (
               <tr key={r.adId + i} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
                 <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={r.adName}>{r.adName}</td>
                 <td className="px-4 py-2.5 text-slate-600 max-w-[200px] truncate" title={r.campaignName}>{r.campaignName}</td>
@@ -1092,6 +1112,18 @@ export default function DashboardView({
           </tbody>
         </table>
       </div>
+      {sorted.length > 10 && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((s) => !s)}
+            className="text-xs text-blue-700 hover:text-blue-900 font-medium px-3 py-1.5 rounded-md hover:bg-blue-50 transition-colors"
+          >
+            {expanded ? `Show top 10 only` : `Show all ${sorted.length} rows (${hiddenCount} more)`}
+          </button>
+        </div>
+      )}
+      </>
     );
   }
 
