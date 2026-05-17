@@ -35,8 +35,12 @@ interface MessagesResp {
       messageType?: string;
       direction?: string;
       dateAdded?: string;
-      callDuration?: number;
-      meta?: { callStatus?: string };
+      /** Top-level status (mirrors meta.call.status for calls). */
+      status?: string;
+      /** Inbound calls handled by AI have subType "VOICE_AI" and no userId. */
+      subType?: string;
+      /** Per a 2026 probe: call details live here, NOT at top-level. */
+      meta?: { call?: { status?: string; duration?: number } };
     }>;
     nextPage?: boolean;
     lastMessageId?: string;
@@ -217,6 +221,10 @@ export async function conversationsActivityByDay(
         const isSms =
           m.messageType === "TYPE_SMS" || m.messageType === "TYPE_CUSTOM_SMS";
         if (isCall) {
+          // Inbound calls in this firm are handled by an AI voice agent
+          // (subType: "VOICE_AI") with no userId — there's no human to
+          // attribute them to. We still tally them as unassignedCalls so
+          // the totals stay accurate.
           if (!m.userId) {
             unassignedCalls++;
             continue;
@@ -225,9 +233,16 @@ export async function conversationsActivityByDay(
           const bucket = ensureCallBucket(u, dateKey);
           if (direction === "inbound") bucket.inbound++;
           else bucket.outbound++;
-          const status = m.meta?.callStatus?.toLowerCase();
-          const dur = Number(m.callDuration ?? 0) || 0;
-          if (status === "answered" || (dur > 0 && status !== "missed")) {
+          // Per the 2026 API probe: status + duration live at meta.call.*,
+          // NOT top-level callDuration / meta.callStatus. The old paths
+          // returned undefined and zeroed out the Avg Call column.
+          const callMeta = m.meta?.call ?? {};
+          const status = (callMeta.status ?? m.status ?? "").toLowerCase();
+          const dur = Number(callMeta.duration ?? 0) || 0;
+          // "completed" is the canonical "the call connected and ended
+          // cleanly" signal. Fallback to duration>0 for older records
+          // where status wasn't set.
+          if (status === "completed" || status === "answered" || dur > 0) {
             bucket.answered++;
             bucket.durationSeconds += dur;
           }

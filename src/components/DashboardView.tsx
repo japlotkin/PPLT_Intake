@@ -1420,6 +1420,7 @@ export default function DashboardView({
     const info: string[] = [
       syncStatus,
       "Referrals / Signed attribution: the rep who initiated the action gets credit, defined as the intake user who sent the most recent outbound call/SMS to that contact in the 14 days BEFORE the opp's stage flipped to referred / signed. opp.assignedTo is ignored — this firm's GHL setup doesn't populate it reliably.",
+      "Calls In is always 0 — your inbound calls are answered by an AI voice agent (subType: VOICE_AI) with no human userId attached, so they cannot be attributed to an intake rep. Calls Out and SMS are real per-rep counts (filtered to messages with an actual userId).",
     ];
     return (
       <section id="intake">
