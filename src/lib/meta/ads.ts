@@ -48,10 +48,33 @@ interface InsightsResp {
   paging?: { next?: string };
 }
 
+/**
+ * Count Meta lead-form completions for an ad. Meta returns several
+ * lead-like action_types; for Lead Ads the canonical count is
+ * `offsite_complete_registration_add_meta_leads` — submissions to a
+ * Meta Lead Form that get pushed off-platform (i.e., to GHL via the
+ * Lead Ads webhook). That's what "Lead Forms (Meta/GHL)" means.
+ *
+ * Fallback chain (first hit wins) so older ads / non-Lead-Ad creatives
+ * still report a number:
+ *   1. offsite_complete_registration_add_meta_leads  (Lead Ads -> CRM)
+ *   2. onsite_conversion.lead                        (on-Facebook leads)
+ *   3. lead                                          (catch-all, rarely
+ *                                                     populated now)
+ */
 function leadCount(actions?: RawAction[]): number {
   if (!actions) return 0;
-  for (const a of actions) {
-    if (a.action_type === "lead") return Number(a.value) || 0;
+  const ranked = [
+    "offsite_complete_registration_add_meta_leads",
+    "onsite_conversion.lead",
+    "lead",
+  ];
+  for (const t of ranked) {
+    const a = actions.find((x) => x.action_type === t);
+    if (a) {
+      const n = Number(a.value);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
   }
   return 0;
 }
