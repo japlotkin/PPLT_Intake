@@ -74,6 +74,86 @@ function fmtSeconds(secs: number | null): string {
 }
 
 /**
+ * Detect a Meta-API-blocked state from the warnings array + cost payload
+ * and render a prominent top-of-dashboard banner pointing at the fix.
+ * Falls back to null when Meta is healthy.
+ */
+function metaBlockedBanner(data: DashboardData): ReactNode {
+  const warnings = data.warnings ?? [];
+  const isBlocked = warnings.some(
+    (w) =>
+      w.toLowerCase().includes("api access blocked") ||
+      w.toLowerCase().includes("meta ad insights fetch failed")
+  );
+  const staleAsOf = data.cost?.metaStaleAsOf;
+  if (!isBlocked && !staleAsOf) return null;
+
+  const APP_DASH =
+    "https://developers.facebook.com/apps/1522616902816088/dashboard/";
+
+  // Two flavours:
+  //   - "Meta blocked AND we have cached data" => amber, still useful
+  //   - "Meta blocked AND no fallback" => red, action required
+  if (staleAsOf) {
+    return (
+      <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-sm flex items-start gap-3">
+        <span aria-hidden className="text-lg leading-none">⚠</span>
+        <div className="flex-1 space-y-1">
+          <div className="font-semibold">Meta access needs to be restored</div>
+          <div className="text-xs text-amber-800 leading-relaxed">
+            Live Meta fetch returned <span className="font-mono">API access blocked</span>.
+            Ad Cost is showing cached data from{" "}
+            <span className="font-medium">{new Date(staleAsOf).toLocaleString()}</span>.
+            Fix: open{" "}
+            <a
+              href={APP_DASH}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline font-medium hover:text-amber-950"
+            >
+              the Jaguar Ad Reporting App dashboard
+            </a>{" "}
+            and verify the app is in <strong>Live</strong> mode (not Development) and
+            that the system user&apos;s token is still valid. Once fixed, click{" "}
+            <strong>Refresh</strong> to repopulate.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-rose-300 bg-rose-50 text-rose-900 px-4 py-3 text-sm flex items-start gap-3">
+      <span aria-hidden className="text-lg leading-none">⚠</span>
+      <div className="flex-1 space-y-1">
+        <div className="font-semibold">Meta access blocked — action required</div>
+        <div className="text-xs text-rose-800 leading-relaxed">
+          Live Meta fetch is failing AND there&apos;s no cached fallback. Ad Cost
+          will be blank until Meta access is restored. Fix:
+          <ol className="list-decimal pl-5 mt-1 space-y-0.5">
+            <li>
+              Open{" "}
+              <a
+                href={APP_DASH}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline font-medium hover:text-rose-950"
+              >
+                the Jaguar Ad Reporting App dashboard
+              </a>
+              .
+            </li>
+            <li>Check the app mode badge near the top. If &quot;In development&quot;, switch to <strong>Live</strong>.</li>
+            <li>If Live, regenerate the system user token: business.facebook.com → System Users → Jaguar_Meta_Reporting → Generate token (scopes: ads_read, business_management, read_insights).</li>
+            <li>Update <span className="font-mono">META_ACCESS_TOKEN</span> in Vercel env, redeploy, click Refresh here.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Find dynamic compute warnings for a section. dashboardCompute prefixes
  * each warning with the section label (e.g. "Cost analytics: ..."). This
  * filter returns the matching warning strings sans prefix.
@@ -519,6 +599,7 @@ export default function DashboardView({
             {error}
           </div>
         )}
+        {data && metaBlockedBanner(data)}
         {data?.warnings && data.warnings.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50/70 text-amber-900 px-4 py-3 text-xs space-y-1">
             {data.warnings.map((w, i) => (
