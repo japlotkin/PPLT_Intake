@@ -1,7 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Sparkles, Save, Loader2, Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
+import {
+  Sparkles,
+  Save,
+  Loader2,
+  Lock,
+  ArrowLeft,
+  CheckCircle2,
+  Mail,
+  Send,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import {
@@ -36,6 +46,13 @@ interface ConfigShape {
   updatedBy: string;
 }
 
+interface Invitation {
+  id: string;
+  emailAddress: string;
+  status: string;
+  createdAt: string | null;
+}
+
 export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -46,6 +63,15 @@ export default function AdminPage() {
   const [configLoading, setConfigLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  // Invitation state
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("custom");
+  const [inviteRestrict, setInviteRestrict] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [invitationsError, setInvitationsError] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -65,9 +91,78 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadInvitations = useCallback(async () => {
+    setInvitationsError(null);
+    try {
+      const res = await fetch("/api/admin/invite");
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? `Failed: ${res.status}`);
+      }
+      const j = (await res.json()) as { invitations: Invitation[] };
+      // Only show pending invites
+      setInvitations(j.invitations.filter((i) => i.status === "pending"));
+    } catch (e) {
+      setInvitationsError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
+    loadInvitations();
+  }, [loadUsers, loadInvitations]);
+
+  async function sendInvite() {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteResult(null);
+    try {
+      const res = await fetch("/api/admin/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail.trim().toLowerCase(),
+          role: inviteRole === "custom" ? undefined : inviteRole,
+          restrictIntakeToOwnRow: inviteRestrict,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        invitation?: { emailAddress?: string };
+      };
+      if (!res.ok) throw new Error(j.error ?? `Failed: ${res.status}`);
+      setInviteResult(
+        `Invitation sent to ${j.invitation?.emailAddress ?? inviteEmail}. Clerk will email a sign-up link.`
+      );
+      setInviteEmail("");
+      setInviteRole("custom");
+      setInviteRestrict(false);
+      loadInvitations();
+    } catch (e) {
+      setInviteResult(
+        "Error: " + (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function revokeInvite(invitationId: string) {
+    if (!confirm("Revoke this invitation? The user will no longer be able to use the existing link.")) return;
+    try {
+      const res = await fetch(
+        `/api/admin/invite?invitationId=${encodeURIComponent(invitationId)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? `Failed: ${res.status}`);
+      }
+      loadInvitations();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const loadConfig = useCallback(async (email: string) => {
     setConfigLoading(true);
@@ -216,7 +311,99 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-[1400px] mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-        <aside className="rounded-xl border border-slate-200 bg-white overflow-hidden h-fit">
+        <aside className="space-y-4 h-fit">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Mail className="h-4 w-4 text-blue-600" /> Invite a user
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Clerk emails a sign-up link. The invitee skips the firm password and
+            creates their own login.
+          </p>
+          <input
+            type="email"
+            placeholder="email@example.com"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value as Role)}
+            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="custom">Custom · sees everything by default</option>
+            <option value="manager">Manager · no Ad Cost</option>
+            <option value="staff">Staff · Overview + KPIs + own Intake row only</option>
+          </select>
+          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={inviteRestrict}
+              onChange={(e) => setInviteRestrict(e.target.checked)}
+              className="h-3.5 w-3.5"
+            />
+            Restrict Intake Team to their own row
+          </label>
+          <button
+            onClick={sendInvite}
+            disabled={inviting || !inviteEmail.trim()}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-3 py-1.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Send invite
+          </button>
+          {inviteResult && (
+            <p className={`text-[11px] leading-relaxed ${
+              inviteResult.startsWith("Error") ? "text-rose-700" : "text-emerald-700"
+            }`}>
+              {inviteResult}
+            </p>
+          )}
+        </div>
+
+        {(invitations.length > 0 || invitationsError) && (
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200">
+              <div className="text-sm font-semibold text-slate-900">
+                Pending invitations
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Sent but not yet accepted
+              </div>
+            </div>
+            {invitationsError && (
+              <div className="px-4 py-2 text-xs text-rose-700 bg-rose-50">
+                {invitationsError}
+              </div>
+            )}
+            <ul className="divide-y divide-slate-100">
+              {invitations.map((inv) => (
+                <li key={inv.id} className="px-4 py-2.5 flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-slate-800 truncate">
+                      {inv.emailAddress}
+                    </div>
+                    {inv.createdAt && (
+                      <div className="text-[10px] text-slate-400">
+                        sent {new Date(inv.createdAt).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => revokeInvite(inv.id)}
+                    className="text-rose-600 hover:text-rose-800 p-1"
+                    title="Revoke invitation"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-200">
             <div className="text-sm font-semibold text-slate-900">Users</div>
             <div className="text-xs text-slate-500">Pick a user to edit</div>
@@ -272,6 +459,7 @@ export default function AdminPage() {
               );
             })}
           </ul>
+        </div>
         </aside>
 
         <section>
