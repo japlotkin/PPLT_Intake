@@ -540,6 +540,15 @@ export default function DashboardView({
               </div>
             </div>
           )}
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            <span className="font-semibold">* Lead Forms (Meta/GHL):</span>{" "}
+            GHL contacts whose source is a Meta (Facebook / Instagram)
+            lead-ad form, deduped within 3 days by phone (or email fallback)
+            so multiple form-fills from the same person for the same case
+            count once. Same person submitting more than 3 days apart
+            counts as a new lead. Meta leads that didn't land in GHL are
+            excluded by definition.
+          </p>
         </div>
       </section>
     );

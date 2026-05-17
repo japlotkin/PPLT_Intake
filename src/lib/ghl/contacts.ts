@@ -128,47 +128,28 @@ export async function contactsInRange(
 }
 
 /**
- * Is this contact source one we count as "Online"?
+ * Is this contact source one we count as a "Meta lead form that landed in
+ * GHL"? The dashboard's lead count is defined as: GHL contact whose source
+ * indicates it came from a Meta (Facebook / Instagram) lead-ad form. Meta
+ * leads that never reached GHL aren't counted -- by definition we only
+ * see contacts that GHL has.
  *
- * Includes: Meta (Facebook/Instagram), Google (ads + organic), YouTube,
- *           web forms (settlement calculator, consultation, chat),
- *           and any explicit "organic" or "web" labels.
- * Excludes: manual entries, walk-ins, phone-call-ins, prior clients,
- *           verbal referrals, and unknown / direct.
- *
- * GHL sources are messy free text, so we match by keyword. The
- * EXCLUDED list short-circuits common offline labels first so a value
- * like "Referral from Facebook friend" doesn't sneak into Online.
+ * Matches: any Facebook variant (FB Lead Ads, fb_form, etc.), any
+ *          Instagram variant (IG ads, instagram_lead_ads), and the
+ *          generic 'LeadConnector' / 'lead form' labels that Meta-
+ *          integration webhooks sometimes set.
+ * Excludes: Google, YouTube, organic, walk-in, phone, referral,
+ *           prior client, direct, unknown, etc.
  */
-export function isOnlineSource(raw: string | undefined | null): boolean {
+export function isMetaLeadFormSource(raw: string | undefined | null): boolean {
   if (!raw) return false;
   const r = raw.trim().toLowerCase();
   if (!r) return false;
-  // Explicit offline buckets first (short-circuit before keyword match).
-  if (
-    r === "manual" ||
-    r === "import" ||
-    r === "walk-in" ||
-    r === "walk in" ||
-    r === "phone" ||
-    r === "phone call" ||
-    r === "call in" ||
-    r === "sms" ||
-    r === "text" ||
-    r === "prior client" ||
-    r === "referral" ||
-    r === "direct" ||
-    r === "unknown" ||
-    r === "other"
-  ) {
-    return false;
-  }
-  // Keywords that count as Online
-  if (/facebook|fb[\s-]?lead|instagram|\bigads?\b/.test(r)) return true;
-  if (/google|youtube|bing|tiktok|reddit/.test(r)) return true;
-  if (/calculator|consultation|chat|webform|web[\s-]?form|landing/.test(r)) return true;
-  if (r.includes("organic") || r.includes("seo")) return true;
-  if (r.includes("ad") && !r.includes("road")) return true; // crude "ads"/"adwords" net
+  if (/facebook|\bfb\b|fb[\s_-]?lead|fb[\s_-]?form/.test(r)) return true;
+  if (/instagram|\big\b|ig[\s_-]?ads?|ig[\s_-]?lead/.test(r)) return true;
+  if (r === "meta" || r.includes("meta ads")) return true;
+  // Generic Meta-form webhook labels we've seen in GHL:
+  if (r === "lead form" || r === "lead-form" || r === "leadconnector form") return true;
   return false;
 }
 
@@ -195,18 +176,20 @@ const DEDUPE_WINDOW_DAYS = 3;
 const DEDUPE_WINDOW_MS = DEDUPE_WINDOW_DAYS * 24 * 3600 * 1000;
 
 /**
- * "Leads In (Online)" definition: contacts in [start, end) AND source
- * passes isOnlineSource() AND not a duplicate of a SAME-CONTACT entry
- * within the previous 3 days.
+ * "Lead Forms (Meta/GHL)" definition: GHL contacts in [start, end) WHERE
+ *   - source matches a Meta lead-ad form (isMetaLeadFormSource), AND
+ *   - the contact is NOT a duplicate of a prior same-contact submission
+ *     within the previous 3 days.
  *
- * Dedupe runs across the whole walked window (not just the requested
- * range) so a lead on March 31 and a follow-up on April 1 properly mark
- * April 1 as a dupe.
+ * Meta-side lead forms that never landed in GHL are by definition not
+ * counted -- we only see what GHL has.
  *
- * One person submitting on May 1, then May 6 -> two leads (different
- * cases). One person submitting on May 1, then May 2 -> one lead.
+ * Dedupe walks the entire 100-day contact window (not just the
+ * requested range) so a lead on March 31 and a follow-up on April 1
+ * properly mark April 1 as a dupe. One person submitting on May 1, then
+ * May 6 -> two leads (different cases). May 1 then May 2 -> one lead.
  */
-export async function onlineDedupedContactsInRange(
+export async function metaLeadFormsInRange(
   auth: GhlAuth,
   start: Date,
   end: Date
@@ -215,16 +198,15 @@ export async function onlineDedupedContactsInRange(
   const sMs = start.getTime();
   const eMs = end.getTime();
 
-  // Online + valid dateAdded, sorted ascending so dedupe walks chronologically.
-  const online = all
-    .filter((c) => isOnlineSource(c.source))
+  const meta = all
+    .filter((c) => isMetaLeadFormSource(c.source))
     .map((c) => ({ c, t: c.dateAdded ? Date.parse(c.dateAdded) : NaN }))
     .filter((x) => Number.isFinite(x.t))
     .sort((a, b) => a.t - b.t);
 
   const lastSeen = new Map<string, number>();
   const out: RawContact[] = [];
-  for (const { c, t } of online) {
+  for (const { c, t } of meta) {
     const key = dedupeKey(c);
     if (!key) {
       if (t >= sMs && t < eMs) out.push(c);

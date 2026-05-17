@@ -2,7 +2,7 @@
  * Top-of-page Overview metrics: leads / referrals / signed (this period vs
  * prior period) plus active-cases total and Google Review counts.
  */
-import { onlineDedupedContactsInRange } from "../ghl/contacts";
+import { metaLeadFormsInRange } from "../ghl/contacts";
 import { reviewCounts } from "../ghl/reviews";
 import { authAbogado, authPplt, bothAuths } from "../ghl/client";
 import {
@@ -44,8 +44,8 @@ export async function leadsInRange(
 ): Promise<number> {
   const inc = bucketIncludes(bucket);
   const [a, p] = await Promise.all([
-    inc.abogado ? onlineDedupedContactsInRange(authAbogado(), start, end) : Promise.resolve([]),
-    inc.pplt ? onlineDedupedContactsInRange(authPplt(), start, end) : Promise.resolve([]),
+    inc.abogado ? metaLeadFormsInRange(authAbogado(), start, end) : Promise.resolve([]),
+    inc.pplt ? metaLeadFormsInRange(authPplt(), start, end) : Promise.resolve([]),
   ]);
   return a.length + p.length;
 }

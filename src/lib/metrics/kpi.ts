@@ -5,7 +5,7 @@
 import type { KpiBlock } from "../types";
 import { monthsThisYear, quartersThisYear, type Range } from "../dateRanges";
 import { authAbogado, authPplt } from "../ghl/client";
-import { onlineDedupedContactsInRange } from "../ghl/contacts";
+import { metaLeadFormsInRange } from "../ghl/contacts";
 import {
   classifyOpportunities,
   countByStageEntry,
@@ -25,7 +25,7 @@ async function tripleForRange(
 ): Promise<Triple> {
   const auth = bucket === "spanish" ? authAbogado() : authPplt();
   const [contacts, opps] = await Promise.all([
-    onlineDedupedContactsInRange(auth, range.start, range.end),
+    metaLeadFormsInRange(auth, range.start, range.end),
     streamOpportunities(auth),
   ]);
   const classified = classifyOpportunities(auth, opps);
@@ -62,7 +62,7 @@ function buildBlock(title: string, spanish: Triple, english: Triple): KpiBlock {
   return {
     title,
     rows: [
-      { label: "Leads In (Online)", spanish: fmt(spanish.leads), english: fmt(english.leads), total: fmt(totalLeads) },
+      { label: "Lead Forms (Meta/GHL)*", spanish: fmt(spanish.leads), english: fmt(english.leads), total: fmt(totalLeads) },
       { label: "Referred Out", spanish: fmt(spanish.referred), english: fmt(english.referred), total: fmt(totalRef) },
       { label: "Signed", spanish: fmt(spanish.signed), english: fmt(english.signed), total: fmt(totalSigned) },
       {
