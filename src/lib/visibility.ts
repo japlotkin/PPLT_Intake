@@ -59,12 +59,57 @@ export const SUBSECTION_LABELS: Record<string, string> = {
   "cases.signed_co_counsel": "Signed by Co-Counsel Firm",
 };
 
+/**
+ * Permission tier. 'admin' is env-driven (ADMIN_EMAILS) and not stored
+ * per-user. 'manager' and 'staff' are presets that set defaults for the
+ * checkbox-based section visibility. Once an admin manually toggles a
+ * checkbox, the role label becomes 'custom' but the toggle state wins.
+ */
+export type Role = "manager" | "staff" | "custom";
+
+export const ROLE_LABELS: Record<Role, string> = {
+  manager: "Manager — sees everything except Ad Cost",
+  staff: "Staff — Overview + KPIs + own Intake row only",
+  custom: "Custom — per-section overrides",
+};
+
+/**
+ * Preset that the Role dropdown applies when picked. Empty arrays = the
+ * tier sees that section/subsection. Manual checkbox toggles override.
+ */
+export const ROLE_PRESETS: Record<
+  Exclude<Role, "custom">,
+  {
+    hiddenSections: SectionId[];
+    hiddenSubsections: string[];
+    restrictIntakeToOwnRow: boolean;
+  }
+> = {
+  manager: {
+    hiddenSections: ["cost"],
+    hiddenSubsections: ["leads.english_status", "leads.spanish_status"],
+    restrictIntakeToOwnRow: false,
+  },
+  staff: {
+    hiddenSections: ["cost", "leads", "cases"],
+    hiddenSubsections: ["kpi.by_quarter"],
+    restrictIntakeToOwnRow: true,
+  },
+};
+
 export interface VisibilityConfig {
   email: string;
+  /** Optional tier label. Informational — actual access is driven by
+   *  hiddenSections + hiddenSubsections + restrictIntakeToOwnRow. */
+  role?: Role;
   /** Section IDs the user should NOT see. */
   hiddenSections: SectionId[];
   /** Subsection IDs (namespaced "<section>.<sub>") the user should NOT see. */
   hiddenSubsections: string[];
+  /** If true, the Intake Team table is filtered to the user's own row only.
+   *  Useful for the Staff tier so reps see their own activity but not peer
+   *  comparisons. Admin/Manager never have this set. */
+  restrictIntakeToOwnRow?: boolean;
   updatedAt: string;
   updatedBy: string;
 }
@@ -125,6 +170,9 @@ export interface ClientVisibility {
   sections: Record<SectionId, boolean>;
   subsections: Record<string, boolean>;
   isAdmin: boolean;
+  /** When true, the dashboard already filtered intakeTeam[] server-side
+   *  to the current user's row. The client just renders what it got. */
+  restrictIntakeToOwnRow: boolean;
 }
 
 export function toClientVisibility(
@@ -146,9 +194,11 @@ export function toClientVisibility(
       subsections[`${sec}.${sub}`] = true;
     }
   }
+  let restrictIntakeToOwnRow = false;
   if (!isAdmin && cfg) {
     for (const s of cfg.hiddenSections) sections[s] = false;
     for (const ss of cfg.hiddenSubsections) subsections[ss] = false;
+    restrictIntakeToOwnRow = Boolean(cfg.restrictIntakeToOwnRow);
   }
-  return { sections, subsections, isAdmin };
+  return { sections, subsections, isAdmin, restrictIntakeToOwnRow };
 }

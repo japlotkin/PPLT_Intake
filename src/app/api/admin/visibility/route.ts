@@ -14,6 +14,7 @@ import {
   SUBSECTIONS_BY_SECTION,
   type SectionId,
   type VisibilityConfig,
+  type Role,
 } from "@/lib/visibility";
 
 export const runtime = "nodejs";
@@ -60,7 +61,13 @@ export async function PUT(req: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
 
-  let body: { email?: string; hiddenSections?: unknown; hiddenSubsections?: unknown };
+  let body: {
+    email?: string;
+    role?: unknown;
+    hiddenSections?: unknown;
+    hiddenSubsections?: unknown;
+    restrictIntakeToOwnRow?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -81,11 +88,18 @@ export async function PUT(req: Request) {
     ? body.hiddenSubsections
     : []
   ).filter((s): s is string => typeof s === "string" && VALID_SUBSECTIONS.has(s));
+  const role: Role | undefined =
+    body.role === "manager" || body.role === "staff" || body.role === "custom"
+      ? body.role
+      : undefined;
+  const restrictIntakeToOwnRow = Boolean(body.restrictIntakeToOwnRow);
 
   const cfg: VisibilityConfig = {
     email,
+    role,
     hiddenSections,
     hiddenSubsections,
+    restrictIntakeToOwnRow,
     updatedAt: new Date().toISOString(),
     updatedBy: admin,
   };

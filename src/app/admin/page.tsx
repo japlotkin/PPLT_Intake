@@ -9,7 +9,10 @@ import {
   SECTION_LABELS,
   SUBSECTION_LABELS,
   SUBSECTIONS_BY_SECTION,
+  ROLE_PRESETS,
+  ROLE_LABELS,
   type SectionId,
+  type Role,
 } from "@/lib/visibility";
 
 interface UserRow {
@@ -25,8 +28,10 @@ interface UserRow {
 
 interface ConfigShape {
   email: string;
+  role?: Role;
   hiddenSections: SectionId[];
   hiddenSubsections: string[];
+  restrictIntakeToOwnRow?: boolean;
   updatedAt: string;
   updatedBy: string;
 }
@@ -74,8 +79,10 @@ export default function AdminPage() {
     } catch {
       setConfig({
         email,
+        role: undefined,
         hiddenSections: [],
         hiddenSubsections: [],
+        restrictIntakeToOwnRow: false,
         updatedAt: "",
         updatedBy: "",
       });
@@ -94,9 +101,36 @@ export default function AdminPage() {
     const has = config.hiddenSections.includes(s);
     setConfig({
       ...config,
+      // Manual toggle implies Custom tier going forward.
+      role: "custom",
       hiddenSections: has
         ? config.hiddenSections.filter((x) => x !== s)
         : [...config.hiddenSections, s],
+    });
+  }
+
+  function applyRolePreset(role: Role) {
+    if (!config) return;
+    if (role === "custom") {
+      setConfig({ ...config, role: "custom" });
+      return;
+    }
+    const preset = ROLE_PRESETS[role];
+    setConfig({
+      ...config,
+      role,
+      hiddenSections: [...preset.hiddenSections],
+      hiddenSubsections: [...preset.hiddenSubsections],
+      restrictIntakeToOwnRow: preset.restrictIntakeToOwnRow,
+    });
+  }
+
+  function toggleOwnRow() {
+    if (!config) return;
+    setConfig({
+      ...config,
+      role: "custom",
+      restrictIntakeToOwnRow: !config.restrictIntakeToOwnRow,
     });
   }
 
@@ -106,6 +140,7 @@ export default function AdminPage() {
     const has = config.hiddenSubsections.includes(key);
     setConfig({
       ...config,
+      role: "custom",
       hiddenSubsections: has
         ? config.hiddenSubsections.filter((x) => x !== key)
         : [...config.hiddenSubsections, key],
@@ -122,8 +157,10 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: config.email,
+          role: config.role,
           hiddenSections: config.hiddenSections,
           hiddenSubsections: config.hiddenSubsections,
+          restrictIntakeToOwnRow: Boolean(config.restrictIntakeToOwnRow),
         }),
       });
       if (!res.ok) {
@@ -278,6 +315,43 @@ export default function AdminPage() {
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                      Role preset
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Picking a tier sets the toggles below. You can manually
+                      override any toggle (the role label becomes &quot;Custom&quot;).
+                    </div>
+                  </div>
+                  <select
+                    value={config.role ?? "custom"}
+                    onChange={(e) => applyRolePreset(e.target.value as Role)}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="custom">{ROLE_LABELS.custom}</option>
+                    <option value="manager">{ROLE_LABELS.manager}</option>
+                    <option value="staff">{ROLE_LABELS.staff}</option>
+                  </select>
+                </div>
+                <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/30">
+                  <label className="flex items-center justify-between gap-3 cursor-pointer">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        Restrict Intake Team to user&apos;s own row only
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        When on, the user sees only their own intake activity, not their peers&apos;.
+                        Server-side filter; peer numbers never reach the browser.
+                      </div>
+                    </div>
+                    <Switch
+                      checked={Boolean(config.restrictIntakeToOwnRow)}
+                      onChange={toggleOwnRow}
+                    />
+                  </label>
+                </div>
                 <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 text-xs uppercase tracking-wider text-slate-500 font-semibold">
                   Toggle off any section or subsection to hide it from this user.
                 </div>
