@@ -278,6 +278,9 @@ export interface CostAnalyticsPayload {
   byAd: AdCostRow[];
   byPracticeArea: PracticeAreaCostRow[];
   byAreaState: AreaStateCostRow[];
+  /** ISO timestamp of the cached Meta pull we fell back to, if the live
+   *  fetch failed. Undefined when fresh. */
+  metaStaleAsOf?: string;
 }
 
 // ----- top-level payload -----

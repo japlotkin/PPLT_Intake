@@ -808,9 +808,13 @@ export default function DashboardView({
     const showPerAd = isSubVisible(data.visibility, "cost", "per_ad");
     const dyn = sectionWarnings(data, ["Cost analytics", "Meta ad insights"]);
     const info: string[] = [];
-    if (c.totalSpend === 0 && c.totalLeadsMeta === 0) {
+    if (c.metaStaleAsOf) {
       info.push(
-        "Meta returning no data for this window. Most common cause: the Meta access token is rejected (\"API access blocked\"). Regenerate from System Users → Jaguar_Meta_Reporting → Generate token, then update Vercel env META_ACCESS_TOKEN."
+        `Live Meta fetch is currently blocked. Showing CACHED Meta data from ${new Date(c.metaStaleAsOf).toLocaleString()}. Spend / Leads / CPL columns are stale; Referred / Signed (joined from GHL) are fresh.`
+      );
+    } else if (c.totalSpend === 0 && c.totalLeadsMeta === 0) {
+      info.push(
+        "Meta returning no data for this window. Most common cause: Meta token rejected (\"API access blocked\") AND no cached Meta data on file. Most likely fix: switch the Jaguar Ad Reporting App from Development -> Live mode at developers.facebook.com/apps/1522616902816088/dashboard/."
       );
     }
     info.push(

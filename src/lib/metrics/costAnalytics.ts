@@ -18,6 +18,11 @@
  * UI subtitle.
  */
 import { allAdInsights, type MetaAdRow } from "../meta/ads";
+import {
+  readMetaAdsCache,
+  writeMetaAdsCache,
+  windowKeyFor,
+} from "../metaAdsCache";
 import { authAbogado, authPplt } from "../ghl/client";
 import { streamContacts } from "../ghl/contacts";
 import {
@@ -46,6 +51,8 @@ export interface CostAnalytics {
   byPracticeArea: PracticeAreaCostRow[]; // sorted by spend desc
   byAreaState: AreaStateCostRow[];       // sorted by spend desc
   warnings: string[];
+  /** ISO timestamp of the cached Meta pull we fell back to, if any. */
+  metaStaleAsOf?: string;
 }
 
 function stateFieldIdsFor(key: LocationKey): string[] {
@@ -125,13 +132,36 @@ export async function costAnalytics(
 ): Promise<CostAnalytics> {
   const warnings: string[] = [];
 
-  // 1. Meta spend at ad level + per-account leads
+  // 1. Meta spend at ad level + per-account leads.
+  //    On success: refresh the KV cache for this window.
+  //    On failure: fall back to the last-successful pull so the section
+  //    doesn't go blank when Meta blocks the token.
   let adsRaw: MetaAdRow[] = [];
+  let metaStaleAsOf: string | undefined;
+  const cacheKey = windowKeyFor(start, end);
   try {
     adsRaw = await allAdInsights(start, end);
+    if (adsRaw.length > 0) {
+      await writeMetaAdsCache(cacheKey, {
+        syncedAt: new Date().toISOString(),
+        startISO: start.toISOString(),
+        endISO: end.toISOString(),
+        ads: adsRaw,
+      }).catch(() => {
+        /* cache write failure is non-fatal */
+      });
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     warnings.push(`Meta ad insights fetch failed: ${msg.slice(0, 200)}`);
+    const cached = await readMetaAdsCache(cacheKey).catch(() => null);
+    if (cached && cached.ads.length > 0) {
+      adsRaw = cached.ads;
+      metaStaleAsOf = cached.syncedAt;
+      warnings.push(
+        `Using cached Meta data from ${new Date(cached.syncedAt).toLocaleString()} (live fetch blocked).`
+      );
+    }
   }
 
   // 2. GHL signed-in-window, indexed by utmAdId
@@ -440,5 +470,6 @@ export async function costAnalytics(
     byPracticeArea,
     byAreaState,
     warnings,
+    metaStaleAsOf,
   };
 }
