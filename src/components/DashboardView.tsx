@@ -486,7 +486,7 @@ export default function DashboardView({
     const dyn = sectionWarnings(data, ["Overview"]);
     const info: string[] = [];
     info.push(
-      `"Leads" counts Meta lead-ad form submissions that landed in GHL, deduped within 3 days. "Referrals" = opps entering co-counsel / referral-broker pipelines. "Signed" = opps entering a signed stage. "Active Cases" counts only in-house active_practice pipelines (excludes co-counsel + brokers).`
+      `"Leads" counts Meta lead-ad form submissions that landed in GHL, deduped within 3 days. "Referred to Co-Counsel" = opps entering co-counsel / referral-broker / referred-out pipelines. "Signed" = opps entering a signed stage. "Active Signed Cases" = currently-open cases in our in-house active_practice pipelines (signed cases minus those later turned down or settled).`
     );
     if (o.reviews.lifetime === 0) {
       info.push("Google Reviews showing zero — Reputation API scope likely missing on the GHL Private Integration Token. Regenerate with Reputation > Read.");
@@ -516,14 +516,14 @@ export default function DashboardView({
           />
           <StatCard
             icon={UserPlus}
-            label="Referrals · Last 30 Days"
+            label="Referred to Co-Counsel · Last 30 Days"
             value={o.referrals30.current.toLocaleString()}
             delta={o.referrals30}
             sub={`Prior 30 days: ${o.referrals30.previous.toLocaleString()}`}
           />
           <StatCard
             icon={UserPlus}
-            label="Referrals · Last 7 Days"
+            label="Referred to Co-Counsel · Last 7 Days"
             value={o.referrals7.current.toLocaleString()}
             delta={o.referrals7}
             sub={`Prior 7 days: ${o.referrals7.previous.toLocaleString()}`}
@@ -544,8 +544,9 @@ export default function DashboardView({
           />
           <StatCard
             icon={Briefcase}
-            label="Active Cases (total)"
+            label="Active Signed Cases"
             value={o.activeTotal.toLocaleString()}
+            sub="Signed minus turned-down minus settled"
           />
         </div>
       </section>

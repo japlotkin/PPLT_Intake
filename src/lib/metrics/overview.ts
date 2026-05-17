@@ -6,7 +6,6 @@ import { metaLeadFormsInRange } from "../ghl/contacts";
 import { reviewCounts } from "../ghl/reviews";
 import { authAbogado, authPplt, bothAuths } from "../ghl/client";
 import {
-  activeNow,
   classifyOpportunities,
   countByStageEntry,
   streamOpportunities,
@@ -156,21 +155,28 @@ export async function overview(
     new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000)),
   ]);
 
-  // Active cases = open opportunities in in-house active_practice pipelines
-  // ONLY. Excludes co-counsel / referral-broker pipelines (where we've
-  // referred the case OUT) and excludes lead/signed/withdrawn/closed-lost
-  // stages. Bucket filter drops the location that's not in scope.
+  // Active Signed Cases = cases still on our books right now.
+  //   = signed up (in an in-house active_practice pipeline)
+  //     MINUS later turned down (client withdrew or referred to co-counsel)
+  //     MINUS settled (case completed / closed)
+  //
+  // Implementation: status === "open" AND pipeline is an in-house
+  // active_practice pipeline. Withdrawn / referred-out / settled cases
+  // all have status !== "open" (or live in a different pipelinePurpose),
+  // so this single predicate captures the net.
   const inHouseAbogadoPipelineIds = new Set(
     activePracticePipelines(getLocation("abogado")).map((p) => p.id)
   );
   const inHousePpltPipelineIds = new Set(
     activePracticePipelines(getLocation("pplt_leads")).map((p) => p.id)
   );
+  const isActiveSigned = (o: { raw: { status?: string; pipelineId?: string | null } }, ids: Set<string>) =>
+    o.raw.status === "open" && ids.has(o.raw.pipelineId ?? "");
   const activeAbogado = inc.abogado
-    ? activeNow(opps.abogado).filter((o) => inHouseAbogadoPipelineIds.has(o.raw.pipelineId ?? "")).length
+    ? opps.abogado.filter((o) => isActiveSigned(o, inHouseAbogadoPipelineIds)).length
     : 0;
   const activePplt = inc.pplt
-    ? activeNow(opps.pplt).filter((o) => inHousePpltPipelineIds.has(o.raw.pipelineId ?? "")).length
+    ? opps.pplt.filter((o) => isActiveSigned(o, inHousePpltPipelineIds)).length
     : 0;
   const activeTotal = activeAbogado + activePplt;
 
