@@ -13,6 +13,8 @@ import {
   DollarSign,
   Target,
   Download,
+  Menu,
+  X,
 } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
 import { DateRangePicker } from "@/components/DateRangePicker";
@@ -192,6 +194,68 @@ function SectionNav({
   );
 }
 
+function MobileNavDrawer({
+  open,
+  onClose,
+  visibility,
+  bucket,
+  onBucketChange,
+}: {
+  open: boolean;
+  onClose: () => void;
+  visibility: DashboardData["visibility"];
+  bucket: Bucket;
+  onBucketChange: (b: Bucket) => void;
+}) {
+  const visibleSections = SECTIONS.filter((s) => isVisible(visibility, s.id));
+  if (!open) return null;
+  return (
+    <div className="lg:hidden fixed inset-0 z-40">
+      <div
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] bg-white shadow-xl flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+          <span className="text-sm font-semibold text-slate-800">Navigation</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100"
+            aria-label="Close navigation"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          <BucketSwitcher
+            value={bucket}
+            onChange={(b) => {
+              onBucketChange(b);
+              onClose();
+            }}
+          />
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold px-1 pb-2">
+              Sections
+            </div>
+            {visibleSections.map((s) => (
+              <a
+                key={s.id}
+                href={`#${s.id}`}
+                onClick={onClose}
+                className="block px-3 py-2 rounded-md text-sm text-slate-700 hover:bg-blue-50/60 hover:text-blue-700 transition-colors"
+              >
+                {s.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 function AdminUserMenu({
   isAdmin,
   onRefresh,
@@ -280,6 +344,7 @@ export default function DashboardView({
   const [refreshing, setRefreshing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [bucket, setBucket] = useState<Bucket>("combined");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ preset });
@@ -344,21 +409,29 @@ export default function DashboardView({
   return (
     <div className="min-h-screen bg-slate-50/50">
       <header className="border-b border-slate-200 bg-white/85 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-3.5 flex flex-wrap items-center gap-4 justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-[0_1px_2px_rgba(37,99,235,0.4)]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3.5 flex flex-wrap items-center gap-2 sm:gap-4 justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="lg:hidden p-1.5 rounded-md text-slate-600 hover:bg-slate-100 shrink-0"
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="hidden sm:flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-[0_1px_2px_rgba(37,99,235,0.4)] shrink-0">
               <Sparkles className="h-4 w-4" />
             </div>
-            <div>
-              <h1 className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-                PPLT Intake Dashboard
+            <div className="min-w-0">
+              <h1 className="text-[14px] sm:text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-2 truncate">
+                <span className="truncate">PPLT Intake Dashboard</span>
                 {demoBadge && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset ring-blue-200">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold uppercase tracking-wider ring-1 ring-inset ring-blue-200 shrink-0">
                     Demo
                   </span>
                 )}
               </h1>
-              <p className="text-[11px] text-slate-500">
+              <p className="hidden sm:block text-[11px] text-slate-500">
                 Pinder Plotkin Legal Team · Abogado Attorney
               </p>
             </div>
@@ -385,13 +458,20 @@ export default function DashboardView({
         </div>
       </header>
 
-      <div className="max-w-[1400px] mx-auto px-6 py-8 flex gap-8">
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        visibility={data?.visibility}
+        bucket={bucket}
+        onBucketChange={setBucket}
+      />
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8 flex gap-6 lg:gap-8">
         <SectionNav
           visibility={data?.visibility}
           bucket={bucket}
           onBucketChange={setBucket}
         />
-        <main className="flex-1 min-w-0 space-y-10">
+        <main className="flex-1 min-w-0 space-y-6 sm:space-y-10">
         {loading && !data && !needsSync && (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-center space-y-2">
             <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
