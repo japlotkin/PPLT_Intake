@@ -13,7 +13,6 @@ import {
   DollarSign,
   Target,
   Download,
-  Hourglass,
 } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
 import { DateRangePicker } from "@/components/DateRangePicker";
@@ -727,13 +726,13 @@ export default function DashboardView({
       );
     }
     info.push(
-      "Signed / Referred counts use cohort attribution: a sign-up in May from an April lead credits April spend. CPSC rows where the window ends < 60 days ago are flagged with an hourglass — more signs may still arrive."
+      "Same-window attribution: Spend in the window divided by Signs / Referrals that HAPPENED in the same window (regardless of when the lead originally came in). Matches how Ads Manager reports it. The 'Leads' column still uses lead-date so it ties to Meta's lead-form count. d→Sign / d→Ref are avg days between createdAt and the date the stage flipped — useful for understanding cycle time."
     );
     return (
       <section id="cost">
         <SectionHeader
           title="Ad Cost"
-          subtitle="Meta ad spend joined with GHL cohort attribution by lead-date"
+          subtitle="Meta ad spend joined with GHL same-window signed / referred attribution"
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
@@ -940,12 +939,7 @@ export default function DashboardView({
                 <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToSigned === null ? "—" : `${r.avgDaysToSigned.toFixed(1)}d`}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">
-                  <span className="inline-flex items-center gap-1 justify-end">
-                    {fmtUsd2(r.cpsc)}
-                    {r.cohortMaturing && r.signed > 0 && (
-                      <Hourglass className="h-3 w-3 text-amber-500" aria-label="Cohort still maturing" />
-                    )}
-                  </span>
+                  {fmtUsd2(r.cpsc)}
                 </td>
               </tr>
             ))}
@@ -1005,12 +999,7 @@ export default function DashboardView({
                 <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToSigned === null ? "—" : `${r.avgDaysToSigned.toFixed(1)}d`}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">
-                  <span className="inline-flex items-center gap-1 justify-end">
-                    {fmtUsd2(r.cpsc)}
-                    {r.cohortMaturing && r.signed > 0 && (
-                      <Hourglass className="h-3 w-3 text-amber-500" aria-label="Cohort still maturing — sign-ups may still arrive from this window" />
-                    )}
-                  </span>
+                  {fmtUsd2(r.cpsc)}
                 </td>
               </tr>
             ))}
@@ -1079,12 +1068,7 @@ export default function DashboardView({
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToSigned === null ? "—" : `${r.avgDaysToSigned.toFixed(1)}d`}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">
-                  <span className="inline-flex items-center gap-1 justify-end">
-                    {fmtUsd2(r.cpsc)}
-                    {r.cohortMaturing && r.signed > 0 && (
-                      <Hourglass className="h-3 w-3 text-amber-500" aria-label="Cohort still maturing" />
-                    )}
-                  </span>
+                  {fmtUsd2(r.cpsc)}
                 </td>
               </tr>
             ))}

@@ -151,20 +151,19 @@ export async function costAnalytics(
   const contactStateA = buildContactStateIndex(contactsA, stateFieldIdsFor("abogado"));
   const contactStateP = buildContactStateIndex(contactsP, stateFieldIdsFor("pplt_leads"));
 
-  // 3. COHORT ATTRIBUTION: bucket each opp by its createdAt (the day the
-  //    lead came in), not by the day it later signed. A May sign-up from
-  //    an April lead is credited to April spend. Caveats:
-  //    - "Signed" = opp.stageClass is signed AT ANY POINT after createdAt.
-  //      Look-ahead is unlimited inside the 180-day opp walk.
-  //    - "Referred" = opp ended up in a co-counsel-tracking OR
-  //      referral-broker pipeline OR a stage classified as referred_out,
-  //      at any point after createdAt.
-  //    - "cohortMaturing" flags windows that end < 60 days ago, where new
-  //      sign-ups may still arrive.
+  // 3. SAME-WINDOW ATTRIBUTION (matches Ads Manager mental model):
+  //    Spend in [start, end) / Signs that HAPPENED in [start, end).
+  //    The signed opp's original lead may pre-date the window -- we
+  //    intentionally mix this-window-spend with all-time leads here
+  //    because reconciliation against a monthly spreadsheet matters
+  //    more than a true CAC. Caveats are surfaced in the UI banner.
+  //
+  //    LEADS column still uses lead-date (opps created in the window):
+  //    that's how we tie Meta-leads count to GHL contacts.
   const DAY_MS = 24 * 3600 * 1000;
-  const cohortMaturing = eMs > Date.now() - 60 * DAY_MS;
 
-  interface CohortAgg {
+  interface AdAgg {
+    leads: number;
     signed: number;
     referred: number;
     daysToSignedSum: number;
@@ -172,7 +171,8 @@ export async function costAnalytics(
     daysToReferredSum: number;
     daysToReferredCount: number;
   }
-  const emptyCohort = (): CohortAgg => ({
+  const emptyAgg = (): AdAgg => ({
+    leads: 0,
     signed: 0,
     referred: 0,
     daysToSignedSum: 0,
@@ -180,42 +180,63 @@ export async function costAnalytics(
     daysToReferredSum: 0,
     daysToReferredCount: 0,
   });
-  const cohortByAdId = new Map<string, CohortAgg>();
+  const aggByAdId = new Map<string, AdAgg>();
 
   for (const o of all) {
     if (!o.includeInMetrics) continue;
-    const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
-    if (!Number.isFinite(created) || created < sMs || created >= eMs) continue;
     const adIds = adIdsForOpp(o);
     if (adIds.length === 0) continue;
     // Last-touch attribution to avoid double-counting an opp across ads.
     const adId = adIds[adIds.length - 1];
-    const slot = cohortByAdId.get(adId) ?? emptyCohort();
+    const slot = aggByAdId.get(adId) ?? emptyAgg();
 
+    const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
     const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
-    if (Number.isFinite(lastChange) && lastChange >= created) {
-      if (o.stageClass === "signed") {
-        slot.signed += 1;
+
+    // LEADS: count opps whose lead came in during the window.
+    if (Number.isFinite(created) && created >= sMs && created < eMs) {
+      slot.leads += 1;
+    }
+    // SIGNED: count opps whose stage changed to signed during the window.
+    //         Lead may have come in earlier.
+    if (
+      o.stageClass === "signed" &&
+      Number.isFinite(lastChange) &&
+      lastChange >= sMs &&
+      lastChange < eMs
+    ) {
+      slot.signed += 1;
+      if (Number.isFinite(created) && lastChange >= created) {
         slot.daysToSignedSum += (lastChange - created) / DAY_MS;
         slot.daysToSignedCount += 1;
       }
-      if (
-        o.stageClass === "referred_out" ||
+    }
+    // REFERRED: opps whose stage changed to referred-out / co-counsel /
+    //           referral-broker during the window.
+    if (
+      (o.stageClass === "referred_out" ||
         o.pipelinePurpose === "co_counsel_tracking" ||
-        o.pipelinePurpose === "referral_broker"
-      ) {
-        slot.referred += 1;
+        o.pipelinePurpose === "referral_broker") &&
+      Number.isFinite(lastChange) &&
+      lastChange >= sMs &&
+      lastChange < eMs
+    ) {
+      slot.referred += 1;
+      if (Number.isFinite(created) && lastChange >= created) {
         slot.daysToReferredSum += (lastChange - created) / DAY_MS;
         slot.daysToReferredCount += 1;
       }
     }
-    cohortByAdId.set(adId, slot);
+
+    aggByAdId.set(adId, slot);
   }
 
-  // 4. Build per-ad rows with cohort numbers
+  // 4. Build per-ad rows. cohortMaturing kept on the row type for
+  //    backward compat with snapshots written by the old code; always
+  //    false now under same-window attribution.
   const byAd: AdCostRow[] = adsRaw.map((ad) => {
     const practiceArea = classifyAdPracticeArea(ad);
-    const cohort = cohortByAdId.get(ad.adId) ?? emptyCohort();
+    const agg = aggByAdId.get(ad.adId) ?? emptyAgg();
     return {
       adId: ad.adId,
       adName: ad.adName,
@@ -225,19 +246,19 @@ export async function costAnalytics(
       practiceArea,
       spend: ad.spend,
       leadsMeta: ad.leads,
-      signed: cohort.signed,
-      referred: cohort.referred,
+      signed: agg.signed,
+      referred: agg.referred,
       cpl: ad.leads > 0 ? ad.spend / ad.leads : null,
-      cpsc: cohort.signed > 0 ? ad.spend / cohort.signed : null,
+      cpsc: agg.signed > 0 ? ad.spend / agg.signed : null,
       avgDaysToSigned:
-        cohort.daysToSignedCount > 0
-          ? cohort.daysToSignedSum / cohort.daysToSignedCount
+        agg.daysToSignedCount > 0
+          ? agg.daysToSignedSum / agg.daysToSignedCount
           : null,
       avgDaysToReferred:
-        cohort.daysToReferredCount > 0
-          ? cohort.daysToReferredSum / cohort.daysToReferredCount
+        agg.daysToReferredCount > 0
+          ? agg.daysToReferredSum / agg.daysToReferredCount
           : null,
-      cohortMaturing,
+      cohortMaturing: false,
     };
   });
   byAd.sort((a, b) => b.spend - a.spend);
@@ -287,7 +308,7 @@ export async function costAnalytics(
       avgDaysToSigned: v.dtsCount > 0 ? v.dts / v.dtsCount : null,
       avgDaysToReferred: v.dtrCount > 0 ? v.dtr / v.dtrCount : null,
       adCount: v.adCount,
-      cohortMaturing,
+      cohortMaturing: false,
     }))
     .sort((a, b) => b.spend - a.spend);
 
@@ -313,14 +334,30 @@ export async function costAnalytics(
   const byAreaStateMap = new Map<string, AreaStateAgg>();
   for (const o of all) {
     if (!o.includeInMetrics) continue;
-    // Cohort: lead must have come in during the window.
-    const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
-    if (!Number.isFinite(created) || created < sMs || created >= eMs) continue;
     const adIds = adIdsForOpp(o);
     if (adIds.length === 0) continue;
     const adId = adIds[adIds.length - 1];
     const ad = adById.get(adId);
     if (!ad || ad.leadsMeta === 0) continue;
+
+    const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
+    const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+    const leadInWindow =
+      Number.isFinite(created) && created >= sMs && created < eMs;
+    const signedInWindow =
+      o.stageClass === "signed" &&
+      Number.isFinite(lastChange) &&
+      lastChange >= sMs &&
+      lastChange < eMs;
+    const referredInWindow =
+      (o.stageClass === "referred_out" ||
+        o.pipelinePurpose === "co_counsel_tracking" ||
+        o.pipelinePurpose === "referral_broker") &&
+      Number.isFinite(lastChange) &&
+      lastChange >= sMs &&
+      lastChange < eMs;
+    if (!leadInWindow && !signedInWindow && !referredInWindow) continue;
+
     const costPerLead = ad.spend / ad.leadsMeta;
     const stateIdx = o.locationKey === "abogado" ? contactStateA : contactStateP;
     const state =
@@ -337,22 +374,20 @@ export async function costAnalytics(
       };
       byAreaStateMap.set(key, slot);
     }
-    slot.leads += 1;
-    slot.spend += costPerLead;
-
-    const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
-    if (Number.isFinite(lastChange) && lastChange >= created) {
-      if (o.stageClass === "signed") {
-        slot.signed += 1;
+    if (leadInWindow) {
+      slot.leads += 1;
+      slot.spend += costPerLead;
+    }
+    if (signedInWindow) {
+      slot.signed += 1;
+      if (Number.isFinite(created) && lastChange >= created) {
         slot.dts += (lastChange - created) / DAY_MS;
         slot.dtsCount += 1;
       }
-      if (
-        o.stageClass === "referred_out" ||
-        o.pipelinePurpose === "co_counsel_tracking" ||
-        o.pipelinePurpose === "referral_broker"
-      ) {
-        slot.referred += 1;
+    }
+    if (referredInWindow) {
+      slot.referred += 1;
+      if (Number.isFinite(created) && lastChange >= created) {
         slot.dtr += (lastChange - created) / DAY_MS;
         slot.dtrCount += 1;
       }
@@ -371,7 +406,7 @@ export async function costAnalytics(
       cpsc: r.signed > 0 ? r.spend / r.signed : null,
       avgDaysToSigned: r.dtsCount > 0 ? r.dts / r.dtsCount : null,
       avgDaysToReferred: r.dtrCount > 0 ? r.dtr / r.dtrCount : null,
-      cohortMaturing,
+      cohortMaturing: false,
     }))
     .sort((a, b) => b.spend - a.spend);
 
