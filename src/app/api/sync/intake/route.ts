@@ -15,12 +15,11 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { authAbogado, authPplt, type GhlAuth } from "@/lib/ghl/client";
-import { conversationsActivity } from "@/lib/ghl/conversations";
+import { conversationsActivityByDay } from "@/lib/ghl/conversations";
 import { intakeUsers, getLocation } from "@/lib/mapping";
 import {
   writeIntakeConversations,
   WINDOW_DAYS,
-  utcDateKey,
   type IntakeConversationsSnapshot,
   type UserDailyActivity,
 } from "@/lib/intakeConversationsStore";
@@ -71,41 +70,26 @@ async function runOneLocation(
   let unassignedCalls = 0;
 
   try {
-    const activity = await conversationsActivity(ghlAuth, start, end);
+    const activity = await conversationsActivityByDay(ghlAuth, start, end);
 
-    // conversationsActivity returns AGGREGATE-OVER-WINDOW totals per user,
-    // not per-day. We want per-day so the dashboard can slice arbitrary
-    // sub-windows (rolling 7d/30d, this_week, last_month, etc.) without
-    // re-walking conversations. So we re-walk message-level here at a
-    // finer granularity.
-    //
-    // For v1, store the aggregate-over-the-full-60d-window as a single
-    // synthetic "bucket" keyed to today. This means the dashboard can
-    // ONLY show calls/SMS over the full window. Per-day breakdown comes
-    // later. (TODO: lift conversations.ts to expose per-day too.)
-    const todayKey = utcDateKey(Date.now());
+    // conversationsActivityByDay already returns per-user per-day
+    // buckets, which is exactly what the KV store expects. We only
+    // need to:
+    //   - drop users who aren't on the intake team for this location
+    //   - convert the inner Map to a plain Record (KV stores JSON)
+    //   - tally totals for the cron-log telemetry
     const byUser: Record<string, UserDailyActivity> = {};
-
-    for (const [userId, summary] of activity.callsByUser) {
+    for (const [userId, perDay] of activity.byUser) {
       if (!intakeIds.has(userId)) continue;
-      const slot: UserDailyActivity = byUser[userId] ?? { calls: {}, sms: {} };
-      slot.calls[todayKey] = {
-        inbound: summary.inbound,
-        outbound: summary.outbound,
-        answered: summary.answered,
-        durationSeconds: summary.durationSeconds,
-      };
-      byUser[userId] = slot;
-      totalCalls += summary.inbound + summary.outbound;
+      byUser[userId] = perDay;
+      for (const b of Object.values(perDay.calls)) {
+        totalCalls += b.inbound + b.outbound;
+      }
+      for (const b of Object.values(perDay.sms)) {
+        totalSms += b.inbound + b.outbound;
+      }
     }
-    for (const [userId, sms] of activity.smsByUser) {
-      if (userId === "(system)" || !intakeIds.has(userId)) continue;
-      const slot: UserDailyActivity = byUser[userId] ?? { calls: {}, sms: {} };
-      slot.sms[todayKey] = { inbound: sms.inbound, outbound: sms.outbound };
-      byUser[userId] = slot;
-      totalSms += sms.inbound + sms.outbound;
-    }
-    unassignedCalls = activity.callsUnassigned;
+    unassignedCalls = activity.unassignedCalls;
 
     const snapshot: IntakeConversationsSnapshot = {
       syncedAt: new Date().toISOString(),
@@ -115,6 +99,11 @@ async function runOneLocation(
       unassignedCalls,
     };
     await writeIntakeConversations(locationKey, snapshot);
+
+    console.log(
+      `[/api/sync/intake] ${locationKey}: scanned ${activity.conversationsScanned} conversations, ` +
+        `${activity.messagesScanned} messages, ${Object.keys(byUser).length} intake users`
+    );
 
     return {
       location: locationKey,

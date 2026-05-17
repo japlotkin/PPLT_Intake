@@ -5,10 +5,16 @@
  *   1. /conversations/search sorted desc by lastMessageDate, stop once we
  *      pass the window's start.
  *   2. For each conversation, walk /conversations/{id}/messages, stop once
- *      messages go past the window's start, count TYPE_CALL / TYPE_SMS.
+ *      messages go past the window's start, bucket TYPE_CALL / TYPE_SMS
+ *      by (userId, UTC-day).
  *
- * This is rate-limited heavy: ~1 request per conversation. Cache the result
- * per (location, window) for the full hour.
+ * Per-day bucketing lets downstream callers slice arbitrary sub-windows
+ * (rolling 7d/30d, this_week, last_month, today's preset) without
+ * re-walking conversations. /api/sync/intake walks once every 4 hours
+ * over a 60-day window and persists the per-day buckets to KV; the
+ * dashboard reads from KV at request time.
+ *
+ * This is rate-limited heavy: ~1 request per conversation per page.
  */
 import { getV2, GhlAuth } from "./client";
 
@@ -36,41 +42,79 @@ interface MessagesResp {
   };
 }
 
-export interface CallSummary {
-  userId: string | null;
+/** "YYYY-MM-DD" in UTC. Matches intakeConversationsStore.utcDateKey. */
+function utcDateKey(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+export interface CallDayBucket {
   inbound: number;
   outbound: number;
   answered: number;
-  missed: number;
-  durationSeconds: number; // sum of answered call duration
+  durationSeconds: number;
 }
 
-export interface ConversationActivity {
-  callsByUser: Map<string, CallSummary>;
-  smsByUser: Map<string, { inbound: number; outbound: number }>;
-  callsUnassigned: number;
+export interface SmsDayBucket {
+  inbound: number;
+  outbound: number;
 }
 
-function emptyCall(uid: string): CallSummary {
-  return {
-    userId: uid,
-    inbound: 0,
-    outbound: 0,
-    answered: 0,
-    missed: 0,
-    durationSeconds: 0,
-  };
+/** Per-user activity over the walked window. Keys: UTC date strings. */
+export interface UserDailyActivity {
+  calls: Record<string, CallDayBucket>;
+  sms: Record<string, SmsDayBucket>;
 }
 
-export async function conversationsActivity(
+export interface ConversationActivityByDay {
+  /** GHL userId -> per-day buckets. */
+  byUser: Map<string, UserDailyActivity>;
+  /** Calls + SMS we couldn't attribute to a user (missing userId on message). */
+  unassignedCalls: number;
+  unassignedSms: number;
+  /** Diagnostics for the cron log. */
+  conversationsScanned: number;
+  messagesScanned: number;
+}
+
+function ensureUser(
+  byUser: Map<string, UserDailyActivity>,
+  userId: string
+): UserDailyActivity {
+  let u = byUser.get(userId);
+  if (!u) {
+    u = { calls: {}, sms: {} };
+    byUser.set(userId, u);
+  }
+  return u;
+}
+
+function ensureCallBucket(activity: UserDailyActivity, dateKey: string): CallDayBucket {
+  let b = activity.calls[dateKey];
+  if (!b) {
+    b = { inbound: 0, outbound: 0, answered: 0, durationSeconds: 0 };
+    activity.calls[dateKey] = b;
+  }
+  return b;
+}
+
+function ensureSmsBucket(activity: UserDailyActivity, dateKey: string): SmsDayBucket {
+  let b = activity.sms[dateKey];
+  if (!b) {
+    b = { inbound: 0, outbound: 0 };
+    activity.sms[dateKey] = b;
+  }
+  return b;
+}
+
+export async function conversationsActivityByDay(
   auth: GhlAuth,
   start: Date,
   end: Date
-): Promise<ConversationActivity> {
+): Promise<ConversationActivityByDay> {
   const startMs = start.getTime();
   const endMs = end.getTime();
 
-  // Step 1: find conversations active in window
+  // Step 1: find conversations active in the window.
   const convIds: string[] = [];
   let startAfterDate: number | undefined;
   let startAfterId: string | undefined;
@@ -104,10 +148,11 @@ export async function conversationsActivity(
     startAfterId = last.id;
   }
 
-  // Step 2: walk messages in each
-  const callsByUser = new Map<string, CallSummary>();
-  const smsByUser = new Map<string, { inbound: number; outbound: number }>();
-  let callsUnassigned = 0;
+  // Step 2: walk messages in each, bucketing by (userId, UTC day).
+  const byUser = new Map<string, UserDailyActivity>();
+  let unassignedCalls = 0;
+  let unassignedSms = 0;
+  let messagesScanned = 0;
 
   for (const cid of convIds) {
     let lastMessageId: string | undefined;
@@ -128,6 +173,7 @@ export async function conversationsActivity(
       if (!msgs.length) break;
       let stop = false;
       for (const m of msgs) {
+        messagesScanned++;
         const da = m.dateAdded;
         if (!da) continue;
         const t = Date.parse(da);
@@ -137,29 +183,31 @@ export async function conversationsActivity(
           continue;
         }
         if (t >= endMs) continue;
+        const dateKey = utcDateKey(t);
         if (m.messageType === "TYPE_CALL") {
           if (!m.userId) {
-            callsUnassigned++;
+            unassignedCalls++;
             continue;
           }
-          const u = callsByUser.get(m.userId) ?? emptyCall(m.userId);
-          if (m.direction === "inbound") u.inbound++;
-          else u.outbound++;
+          const u = ensureUser(byUser, m.userId);
+          const bucket = ensureCallBucket(u, dateKey);
+          if (m.direction === "inbound") bucket.inbound++;
+          else bucket.outbound++;
           const status = m.meta?.callStatus?.toLowerCase();
           const dur = Number(m.callDuration ?? 0) || 0;
           if (status === "answered" || (dur > 0 && status !== "missed")) {
-            u.answered++;
-            u.durationSeconds += dur;
-          } else {
-            u.missed++;
+            bucket.answered++;
+            bucket.durationSeconds += dur;
           }
-          callsByUser.set(m.userId, u);
         } else if (m.messageType === "TYPE_SMS") {
-          const uid = m.userId ?? "(system)";
-          const s = smsByUser.get(uid) ?? { inbound: 0, outbound: 0 };
-          if (m.direction === "inbound") s.inbound++;
-          else s.outbound++;
-          smsByUser.set(uid, s);
+          if (!m.userId) {
+            unassignedSms++;
+            continue;
+          }
+          const u = ensureUser(byUser, m.userId);
+          const bucket = ensureSmsBucket(u, dateKey);
+          if (m.direction === "inbound") bucket.inbound++;
+          else bucket.outbound++;
         }
       }
       if (stop || !wrapper.nextPage) break;
@@ -168,5 +216,11 @@ export async function conversationsActivity(
     }
   }
 
-  return { callsByUser, smsByUser, callsUnassigned };
+  return {
+    byUser,
+    unassignedCalls,
+    unassignedSms,
+    conversationsScanned: convIds.length,
+    messagesScanned,
+  };
 }

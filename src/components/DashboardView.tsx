@@ -1214,7 +1214,7 @@ export default function DashboardView({
           : data.intakeTeam ?? [];
     const dyn = sectionWarnings(data, ["Intake team"]);
     const info: string[] = [
-      "Calls In / Calls Out / SMS / Avg Call now powered by a separate 4-hourly conversation-walk cron (/api/sync/intake). If those columns all show zeros the cron hasn't run yet or KV is empty. 'Referrals' here is opps assigned to the user that entered a co-counsel / referral / broker stage; if a teammate handed off, only the latest assignedTo is recorded.",
+      "Calls In / Calls Out / SMS / Avg Call come from a separate 4-hourly cron (/api/sync/intake) that walks GHL conversations + messages per day. Numbers slice to the date picker. If all four columns show zeros the cron hasn't run yet. 'Referrals' = opps assigned to the user that entered a co-counsel / referral / broker stage; if a teammate handed off, only the latest assignedTo is recorded.",
     ];
     return (
       <section id="intake">
