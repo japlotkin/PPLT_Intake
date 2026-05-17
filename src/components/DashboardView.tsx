@@ -15,6 +15,7 @@ import {
   Download,
   Menu,
   X,
+  BookOpen,
 } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
 import { DateRangePicker } from "@/components/DateRangePicker";
@@ -347,6 +348,13 @@ function AdminUserMenu({
 }) {
   return (
     <UserButton>
+      <UserButton.MenuItems>
+        <UserButton.Link
+          label="Onboarding guide"
+          labelIcon={<BookOpen className="h-4 w-4" />}
+          href="/onboarding"
+        />
+      </UserButton.MenuItems>
       {isAdmin && (
         <UserButton.MenuItems>
           <UserButton.Link

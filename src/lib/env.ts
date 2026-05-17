@@ -53,6 +53,34 @@ export const env = {
     enabled: () => Boolean(opt("KV_REST_API_URL") && opt("KV_REST_API_TOKEN")),
   },
 
-  // Admin
-  adminEmail: () => req("ADMIN_EMAIL").toLowerCase(),
+  // Admin -- supports either ADMIN_EMAILS (comma-separated) or legacy
+  // ADMIN_EMAIL (single email) for back-compat.
+  adminEmails: () => {
+    const multi = opt("ADMIN_EMAILS");
+    const single = opt("ADMIN_EMAIL");
+    const raw = multi ?? single ?? "";
+    return raw
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+  },
+  isAdminEmail: (email: string | null | undefined) => {
+    if (!email) return false;
+    const list = (() => {
+      const multi = opt("ADMIN_EMAILS");
+      const single = opt("ADMIN_EMAIL");
+      const raw = multi ?? single ?? "";
+      return raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+    })();
+    return list.includes(email.trim().toLowerCase());
+  },
+  /** Legacy single-email accessor. Returns the FIRST admin email or throws. */
+  adminEmail: () => {
+    const multi = opt("ADMIN_EMAILS");
+    const single = opt("ADMIN_EMAIL");
+    const raw = multi ?? single ?? "";
+    const first = raw.split(",").map((e) => e.trim()).filter(Boolean)[0];
+    if (!first) throw new Error("ADMIN_EMAILS / ADMIN_EMAIL not configured");
+    return first.toLowerCase();
+  },
 };

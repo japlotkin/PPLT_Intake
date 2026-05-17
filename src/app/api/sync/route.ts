@@ -33,7 +33,7 @@ async function isAdminRequest(): Promise<boolean> {
   if (!userId) return false;
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  return email === env.adminEmail();
+  return env.isAdminEmail(email);
 }
 
 export async function POST(req: Request) {

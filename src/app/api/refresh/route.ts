@@ -22,7 +22,7 @@ export async function POST() {
   }
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (email !== env.adminEmail()) {
+  if (!env.isAdminEmail(email)) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 

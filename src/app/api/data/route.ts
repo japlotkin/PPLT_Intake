@@ -38,7 +38,7 @@ export async function GET(req: Request) {
   const me = await currentUser();
   const myEmail = me?.primaryEmailAddress?.emailAddress ?? "";
   const cfg = myEmail ? await readVisibility(myEmail) : null;
-  const visibility = toClientVisibility(cfg, myEmail, env.adminEmail());
+  const visibility = toClientVisibility(cfg, myEmail, env.isAdminEmail(myEmail));
 
   return NextResponse.json({
     ...envelope.data,

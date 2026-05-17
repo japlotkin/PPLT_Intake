@@ -24,8 +24,8 @@ async function requireAdmin(): Promise<string | null> {
   if (!userId) return null;
   const me = await currentUser();
   const myEmail = me?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (myEmail !== env.adminEmail()) return null;
-  return myEmail;
+  if (!env.isAdminEmail(myEmail)) return null;
+  return myEmail ?? null;
 }
 
 export async function GET(req: Request) {
@@ -68,9 +68,9 @@ export async function PUT(req: Request) {
   }
   const email = (body.email ?? "").toString().toLowerCase();
   if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
-  if (email === env.adminEmail()) {
+  if (env.isAdminEmail(email)) {
     return NextResponse.json(
-      { error: "Cannot restrict the admin account" },
+      { error: "Cannot restrict an admin account" },
       { status: 400 }
     );
   }

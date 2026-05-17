@@ -17,7 +17,7 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const me = await currentUser();
   const myEmail = me?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (myEmail !== env.adminEmail()) {
+  if (!env.isAdminEmail(myEmail)) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 
@@ -34,7 +34,7 @@ export async function GET() {
       email,
       firstName: u.firstName ?? "",
       lastName: u.lastName ?? "",
-      isAdmin: email.toLowerCase() === env.adminEmail(),
+      isAdmin: env.isAdminEmail(email),
       hasConfig: Boolean(cfg),
       hiddenSectionCount: cfg ? cfg.hiddenSections.length : 0,
       hiddenSubsectionCount: cfg ? cfg.hiddenSubsections.length : 0,

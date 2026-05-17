@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const me = await currentUser();
   const myEmail = me?.primaryEmailAddress?.emailAddress?.toLowerCase();
-  if (myEmail !== env.adminEmail()) {
+  if (!env.isAdminEmail(myEmail)) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 

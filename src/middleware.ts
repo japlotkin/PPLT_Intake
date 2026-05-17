@@ -17,7 +17,7 @@ const isSignInRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 const isApiRoute = createRouteMatcher(["/api/(.*)"]);
 // Demo route + its data endpoint render a hand-crafted fixture so the UI can
 // be previewed without GHL/Meta data, gate password, or a Clerk session.
-const isDemoRoute = createRouteMatcher(["/demo", "/api/mock-data"]);
+const isDemoRoute = createRouteMatcher(["/demo", "/api/mock-data", "/onboarding"]);
 // /api/sync is auth'd by CRON_SECRET (Vercel Cron) or admin Clerk session
 // inside the route handler. Vercel Cron sends no cookies, so the gate
 // would block it -- skip the gate for this path.

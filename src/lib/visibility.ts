@@ -94,14 +94,14 @@ export async function listAllVisibility(): Promise<VisibilityConfig[]> {
   return results.filter((x): x is VisibilityConfig => x !== null);
 }
 
-/** Returns true if the section is visible to the email. Admin always sees all. */
+/** Returns true if the section is visible to the email. Admins always see all. */
 export function isSectionVisible(
   cfg: VisibilityConfig | null,
   email: string,
-  adminEmail: string,
+  isAdmin: boolean,
   section: SectionId
 ): boolean {
-  if (email.toLowerCase() === adminEmail.toLowerCase()) return true;
+  if (isAdmin) return true;
   if (!cfg) return true;
   return !cfg.hiddenSections.includes(section);
 }
@@ -109,11 +109,11 @@ export function isSectionVisible(
 export function isSubsectionVisible(
   cfg: VisibilityConfig | null,
   email: string,
-  adminEmail: string,
+  isAdmin: boolean,
   section: SectionId,
   subsection: string
 ): boolean {
-  if (email.toLowerCase() === adminEmail.toLowerCase()) return true;
+  if (isAdmin) return true;
   if (!cfg) return true;
   if (cfg.hiddenSections.includes(section)) return false;
   const key = `${section}.${subsection}`;
@@ -130,9 +130,8 @@ export interface ClientVisibility {
 export function toClientVisibility(
   cfg: VisibilityConfig | null,
   email: string,
-  adminEmail: string
+  isAdmin: boolean
 ): ClientVisibility {
-  const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
   const sections: Record<SectionId, boolean> = {
     overview: true,
     kpi: true,
