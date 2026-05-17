@@ -128,6 +128,118 @@ export async function contactsInRange(
 }
 
 /**
+ * Is this contact source one we count as "Online"?
+ *
+ * Includes: Meta (Facebook/Instagram), Google (ads + organic), YouTube,
+ *           web forms (settlement calculator, consultation, chat),
+ *           and any explicit "organic" or "web" labels.
+ * Excludes: manual entries, walk-ins, phone-call-ins, prior clients,
+ *           verbal referrals, and unknown / direct.
+ *
+ * GHL sources are messy free text, so we match by keyword. The
+ * EXCLUDED list short-circuits common offline labels first so a value
+ * like "Referral from Facebook friend" doesn't sneak into Online.
+ */
+export function isOnlineSource(raw: string | undefined | null): boolean {
+  if (!raw) return false;
+  const r = raw.trim().toLowerCase();
+  if (!r) return false;
+  // Explicit offline buckets first (short-circuit before keyword match).
+  if (
+    r === "manual" ||
+    r === "import" ||
+    r === "walk-in" ||
+    r === "walk in" ||
+    r === "phone" ||
+    r === "phone call" ||
+    r === "call in" ||
+    r === "sms" ||
+    r === "text" ||
+    r === "prior client" ||
+    r === "referral" ||
+    r === "direct" ||
+    r === "unknown" ||
+    r === "other"
+  ) {
+    return false;
+  }
+  // Keywords that count as Online
+  if (/facebook|fb[\s-]?lead|instagram|\bigads?\b/.test(r)) return true;
+  if (/google|youtube|bing|tiktok|reddit/.test(r)) return true;
+  if (/calculator|consultation|chat|webform|web[\s-]?form|landing/.test(r)) return true;
+  if (r.includes("organic") || r.includes("seo")) return true;
+  if (r.includes("ad") && !r.includes("road")) return true; // crude "ads"/"adwords" net
+  return false;
+}
+
+/**
+ * Normalize a phone string to its last 10 digits (US convention).
+ * Returns empty string if there's nothing usable.
+ */
+function normPhone(raw: string | undefined | null): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+/** Dedupe key for a contact: normalized phone, or lowercased email. */
+function dedupeKey(c: RawContact): string {
+  const p = normPhone(c.phone);
+  if (p) return `p:${p}`;
+  const e = (c.email ?? "").trim().toLowerCase();
+  if (e) return `e:${e}`;
+  return ""; // no key -> can't dedupe, always count
+}
+
+const DEDUPE_WINDOW_DAYS = 3;
+const DEDUPE_WINDOW_MS = DEDUPE_WINDOW_DAYS * 24 * 3600 * 1000;
+
+/**
+ * "Leads In (Online)" definition: contacts in [start, end) AND source
+ * passes isOnlineSource() AND not a duplicate of a SAME-CONTACT entry
+ * within the previous 3 days.
+ *
+ * Dedupe runs across the whole walked window (not just the requested
+ * range) so a lead on March 31 and a follow-up on April 1 properly mark
+ * April 1 as a dupe.
+ *
+ * One person submitting on May 1, then May 6 -> two leads (different
+ * cases). One person submitting on May 1, then May 2 -> one lead.
+ */
+export async function onlineDedupedContactsInRange(
+  auth: GhlAuth,
+  start: Date,
+  end: Date
+): Promise<RawContact[]> {
+  const all = await streamContacts(auth);
+  const sMs = start.getTime();
+  const eMs = end.getTime();
+
+  // Online + valid dateAdded, sorted ascending so dedupe walks chronologically.
+  const online = all
+    .filter((c) => isOnlineSource(c.source))
+    .map((c) => ({ c, t: c.dateAdded ? Date.parse(c.dateAdded) : NaN }))
+    .filter((x) => Number.isFinite(x.t))
+    .sort((a, b) => a.t - b.t);
+
+  const lastSeen = new Map<string, number>();
+  const out: RawContact[] = [];
+  for (const { c, t } of online) {
+    const key = dedupeKey(c);
+    if (!key) {
+      if (t >= sMs && t < eMs) out.push(c);
+      continue;
+    }
+    const prev = lastSeen.get(key);
+    const isDupe = prev !== undefined && t - prev < DEDUPE_WINDOW_MS;
+    lastSeen.set(key, t); // always update — rolling window
+    if (isDupe) continue;
+    if (t >= sMs && t < eMs) out.push(c);
+  }
+  return out;
+}
+
+/**
  * Normalize a raw `source` string into a friendly source bucket. We don't
  * want 30 variants of "Facebook" in the pie chart.
  */

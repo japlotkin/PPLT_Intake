@@ -5,7 +5,7 @@
 import type { KpiBlock } from "../types";
 import { monthsThisYear, quartersThisYear, type Range } from "../dateRanges";
 import { authAbogado, authPplt } from "../ghl/client";
-import { contactsInRange } from "../ghl/contacts";
+import { onlineDedupedContactsInRange } from "../ghl/contacts";
 import {
   classifyOpportunities,
   countByStageEntry,
@@ -25,7 +25,7 @@ async function tripleForRange(
 ): Promise<Triple> {
   const auth = bucket === "spanish" ? authAbogado() : authPplt();
   const [contacts, opps] = await Promise.all([
-    contactsInRange(auth, range.start, range.end),
+    onlineDedupedContactsInRange(auth, range.start, range.end),
     streamOpportunities(auth),
   ]);
   const classified = classifyOpportunities(auth, opps);

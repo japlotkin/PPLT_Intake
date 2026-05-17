@@ -2,7 +2,7 @@
  * Top-of-page Overview metrics: leads / referrals / signed (this period vs
  * prior period) plus active-cases total and Google Review counts.
  */
-import { contactsInRange } from "../ghl/contacts";
+import { onlineDedupedContactsInRange } from "../ghl/contacts";
 import { reviewCounts } from "../ghl/reviews";
 import { authAbogado, authPplt, bothAuths } from "../ghl/client";
 import {
@@ -30,7 +30,13 @@ function bucketIncludes(bucket: OverviewBucket): { abogado: boolean; pplt: boole
   };
 }
 
-/** Count leads (contacts created) within a range, scoped to a bucket. */
+/**
+ * Count leads (contacts created) within a range, scoped to a bucket.
+ * "Lead" definition matches the firm's spreadsheet: source must pass
+ * isOnlineSource(), and we dedupe same-contact submissions within 3
+ * days (one person, multiple form-fills for the same case = one lead;
+ * the same person calling back >3 days later = a new lead).
+ */
 export async function leadsInRange(
   start: Date,
   end: Date,
@@ -38,8 +44,8 @@ export async function leadsInRange(
 ): Promise<number> {
   const inc = bucketIncludes(bucket);
   const [a, p] = await Promise.all([
-    inc.abogado ? contactsInRange(authAbogado(), start, end) : Promise.resolve([]),
-    inc.pplt ? contactsInRange(authPplt(), start, end) : Promise.resolve([]),
+    inc.abogado ? onlineDedupedContactsInRange(authAbogado(), start, end) : Promise.resolve([]),
+    inc.pplt ? onlineDedupedContactsInRange(authPplt(), start, end) : Promise.resolve([]),
   ]);
   return a.length + p.length;
 }
