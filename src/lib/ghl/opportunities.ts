@@ -21,7 +21,8 @@ import { getV2, GhlAuth } from "./client";
  * Vercel function's invocation lifetime, so the same opps don't get
  * re-fetched on every per-section retry.
  */
-const STREAM_TTL_MS = 5 * 60_000;
+// 15 minutes — see contacts.ts for rationale.
+const STREAM_TTL_MS = 15 * 60_000;
 type StreamCacheEntry = { expires: number; promise: Promise<RawOpportunity[]> };
 const streamCache = new Map<string, StreamCacheEntry>();
 

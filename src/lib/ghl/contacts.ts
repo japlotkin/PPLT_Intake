@@ -35,7 +35,10 @@ interface SearchResp {
   searchAfter?: unknown;
 }
 
-const STREAM_TTL_MS = 5 * 60_000;
+// 15 minutes: /api/sync does 8 presets sequentially and the cron sometimes
+// runs back-to-back. A short TTL forces re-walking GHL across presets and
+// pushes total sync time past Vercel's 300s function cap.
+const STREAM_TTL_MS = 15 * 60_000;
 // KPI table only goes back current quarter + last quarter (max ~6 months).
 // Overview only goes back to last month. 100 days is enough for both with
 // a small buffer for week-vs-last-week deltas; keeps pagination tractable.

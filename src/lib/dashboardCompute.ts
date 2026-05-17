@@ -11,6 +11,7 @@
  */
 import { authAbogado, authPplt } from "./ghl/client";
 import { streamOpportunities } from "./ghl/opportunities";
+import { streamContacts } from "./ghl/contacts";
 import { rangeFor, customRange, type Preset } from "./dateRanges";
 import { overview } from "./metrics/overview";
 import { kpiTable } from "./metrics/kpi";
@@ -28,7 +29,8 @@ import type {
   OverviewData,
 } from "./types";
 
-const SECTION_TIMEOUT_MS = 120_000; // 2 minutes per section — generous since cron isn't user-facing
+const SECTION_TIMEOUT_MS = 240_000; // 4 minutes per section — sections all share the same memoized walks once pre-warm finishes
+const PREWARM_TIMEOUT_MS = 270_000; // 4.5 minutes for the underlying GHL opp + contact walks
 
 function emptyOverview(): OverviewData {
   const z = { current: 0, previous: 0, pctChange: 0, direction: "flat" as const };
@@ -93,25 +95,33 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
 
   const warnings: string[] = [];
 
-  // Pre-warm the opportunity walk for both locations. Every section reads
-  // the memoized result, so doing it once here turns 14+ duplicate walks
-  // into 2 (one per location).
+  // Pre-warm the heavy GHL walks (opportunities + contacts, both
+  // locations) BEFORE any section runs. Every section reads the
+  // memoized results, so doing it once here turns 14+ duplicate walks
+  // into 4 fetches total. Without pre-warming streamContacts, sections
+  // that join contact data (Cases, Cost, leads) would race for it and
+  // some would lose to the 120s timeout.
   const prewarmT0 = Date.now();
   try {
     await Promise.race([
       Promise.all([
         streamOpportunities(authAbogado()),
         streamOpportunities(authPplt()),
+        streamContacts(authAbogado()),
+        streamContacts(authPplt()),
       ]),
       new Promise((_, rej) =>
-        setTimeout(() => rej(new Error("opportunities pre-warm timed out after 240s")), 240_000)
+        setTimeout(
+          () => rej(new Error(`pre-warm timed out after ${PREWARM_TIMEOUT_MS / 1000}s`)),
+          PREWARM_TIMEOUT_MS
+        )
       ),
     ]);
-    log(`[compute] opps pre-warm done in ${Date.now() - prewarmT0}ms`);
+    log(`[compute] pre-warm done in ${Date.now() - prewarmT0}ms`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[compute] opps pre-warm failed after ${Date.now() - prewarmT0}ms:`, msg);
-    warnings.push(`Opportunities fetch issue: ${msg.slice(0, 200)} (some sections may be empty)`);
+    console.error(`[compute] pre-warm failed after ${Date.now() - prewarmT0}ms:`, msg);
+    warnings.push(`GHL pre-warm issue: ${msg.slice(0, 200)} (some sections may be empty)`);
   }
 
   const [
