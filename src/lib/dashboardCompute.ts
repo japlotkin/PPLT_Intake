@@ -180,9 +180,9 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
       SECTION_TIMEOUT_MS,
       log
     ),
-    settled<CaseAnalytics>("Case analytics (combined)", () => caseAnalytics("combined"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
-    settled<CaseAnalytics>("Case analytics (English)", () => caseAnalytics("english"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
-    settled<CaseAnalytics>("Case analytics (Spanish)", () => caseAnalytics("spanish"), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<CaseAnalytics>("Case analytics (combined)", () => caseAnalytics("combined", { start: range.start, end: range.end }), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<CaseAnalytics>("Case analytics (English)", () => caseAnalytics("english", { start: range.start, end: range.end }), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
+    settled<CaseAnalytics>("Case analytics (Spanish)", () => caseAnalytics("spanish", { start: range.start, end: range.end }), emptyCases(), warnings, SECTION_TIMEOUT_MS, log),
     settled<CostAnalyticsPayload>(
       "Cost analytics",
       () => costAnalytics(range.start, range.end, range.label),

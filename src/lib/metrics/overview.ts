@@ -178,13 +178,23 @@ export async function overview(
     o.raw.status === "open" &&
     o.stageClass === "signed" &&
     ids.has(o.raw.pipelineId ?? "");
-  const activeAbogado = inc.abogado
-    ? opps.abogado.filter((o) => isActiveSigned(o, inHouseAbogadoPipelineIds)).length
-    : 0;
-  const activePplt = inc.pplt
-    ? opps.pplt.filter((o) => isActiveSigned(o, inHousePpltPipelineIds)).length
-    : 0;
-  const activeTotal = activeAbogado + activePplt;
+
+  // Deduplicate by contactId so a single client with cases in multiple
+  // in-house pipelines (e.g. MVA + WC) counts once, not twice.
+  const uniqueContacts = new Set<string>();
+  if (inc.abogado) {
+    for (const o of opps.abogado) {
+      if (!isActiveSigned(o, inHouseAbogadoPipelineIds)) continue;
+      uniqueContacts.add(`abogado:${o.raw.contactId ?? o.raw.id ?? ""}`);
+    }
+  }
+  if (inc.pplt) {
+    for (const o of opps.pplt) {
+      if (!isActiveSigned(o, inHousePpltPipelineIds)) continue;
+      uniqueContacts.add(`pplt:${o.raw.contactId ?? o.raw.id ?? ""}`);
+    }
+  }
+  const activeTotal = uniqueContacts.size;
 
   return {
     leads30: delta(leads30Cur, leads30Prev),

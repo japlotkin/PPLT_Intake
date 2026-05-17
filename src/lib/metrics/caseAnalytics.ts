@@ -96,7 +96,10 @@ function buildContactStateIndex(
 
 export type CaseBucket = "combined" | "english" | "spanish";
 
-export async function caseAnalytics(bucket: CaseBucket = "combined"): Promise<CaseAnalytics> {
+export async function caseAnalytics(
+  bucket: CaseBucket = "combined",
+  range?: { start: Date; end: Date }
+): Promise<CaseAnalytics> {
   const authA = authAbogado();
   const authP = authPplt();
   const stateFieldsA = stateFieldIdsFor("abogado");
@@ -125,7 +128,16 @@ export async function caseAnalytics(bucket: CaseBucket = "combined"): Promise<Ca
     default:
       oppsBucket = [...oppsA, ...oppsP];
   }
-  const active = activeNow(oppsBucket);
+
+  // Optional date filter. When set, restrict to opps whose lead arrived
+  // (createdAt) in the window. Useful for "case mix of leads from this
+  // period" vs the right-now snapshot.
+  const inWindow = (o: typeof oppsBucket[number]) => {
+    if (!range) return true;
+    const t = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
+    return Number.isFinite(t) && t >= range.start.getTime() && t < range.end.getTime();
+  };
+  const active = activeNow(oppsBucket).filter(inWindow);
 
   const paMap = new Map<string, number>();
   const ccActiveMap = new Map<string, number>();
@@ -168,6 +180,12 @@ export async function caseAnalytics(bucket: CaseBucket = "combined"): Promise<Ca
       o.pipelinePurpose !== "referral_broker"
     )
       continue;
+    // Filter cc-signed by when the stage flipped (lastStageChangeAt) if a
+    // range is set — matches "signed during this period."
+    if (range) {
+      const t = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+      if (!Number.isFinite(t) || t < range.start.getTime() || t >= range.end.getTime()) continue;
+    }
     const firm = o.coCounselFirm ?? o.pipelineName;
     const firmLower = firm.toLowerCase();
     if (firmLower.includes("lexamica")) lexamicaSigned++;

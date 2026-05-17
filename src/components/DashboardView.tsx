@@ -721,7 +721,7 @@ export default function DashboardView({
             icon={Briefcase}
             label="Active Signed Cases"
             value={o.activeTotal.toLocaleString()}
-            sub="Currently in a Retained stage, in-house only"
+            sub="Unique clients in a Retained stage, in-house only"
           />
         </div>
       </section>
@@ -1560,13 +1560,13 @@ export default function DashboardView({
     const brokers = view.referralBrokers;
     const dyn = sectionWarnings(data, ["Case analytics"]);
     const info: string[] = [
-      "All charts are RIGHT-NOW snapshots, not date-filtered. By Practice Area + By State count only in-house active cases. By Co-Counsel counts cases currently sitting in a co-counsel firm's pipeline. By Co-Counsel (Signed) is bounded by the 180-day opportunity walk — older signed-by-co-counsel cases roll off.",
+      `Date picker filters charts to opps whose LEAD CAME IN during the selected window (currently: ${data.range.label}). Active in-house cases + cases at co-counsel firms come from leads that arrived in the period. By Co-Counsel (Signed) filters by when the stage flipped to signed during the window. Set the picker to "Year to Date" or "Last 90 Days" for a broader view.`,
     ];
     return (
       <section id="cases">
         <SectionHeader
           title="Case Analytics"
-          subtitle="Snapshot of currently-active cases · DATE PICKER DOES NOT APPLY (right-now view)"
+          subtitle={`Active in-house cases + signed-by-co-counsel · DATE PICKER APPLIES (leads/signs in ${data.range.label})`}
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
