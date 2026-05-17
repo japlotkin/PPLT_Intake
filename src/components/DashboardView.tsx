@@ -65,6 +65,55 @@ function todayISO() {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Find dynamic compute warnings for a section. dashboardCompute prefixes
+ * each warning with the section label (e.g. "Cost analytics: ..."). This
+ * filter returns the matching warning strings sans prefix.
+ */
+function sectionWarnings(data: DashboardData | null, prefixes: string[]): string[] {
+  if (!data?.warnings || data.warnings.length === 0) return [];
+  const out: string[] = [];
+  for (const w of data.warnings) {
+    for (const p of prefixes) {
+      if (w.toLowerCase().startsWith(p.toLowerCase())) {
+        out.push(w.slice(p.length).replace(/^[:\s]+/, ""));
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * A small inline advisory banner. tone:
+ *   "warn"   = amber, dynamic compute issue
+ *   "info"   = slate, known data caveat / "needs verification" note
+ */
+function SectionWarning({
+  tone = "info",
+  items,
+}: {
+  tone?: "warn" | "info";
+  items: string[];
+}) {
+  if (items.length === 0) return null;
+  const cls =
+    tone === "warn"
+      ? "rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900"
+      : "rounded-lg border border-slate-200 bg-slate-50 text-slate-600";
+  const icon = tone === "warn" ? "⚠" : "ⓘ";
+  return (
+    <div className={`${cls} px-3 py-2 text-[11px] space-y-1 mb-3`}>
+      {items.map((t, i) => (
+        <div key={i} className="flex gap-2">
+          <span aria-hidden className="shrink-0">{icon}</span>
+          <span>{t}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -434,12 +483,22 @@ export default function DashboardView({
           : data.overview;
     const bucketLabel =
       bucket === "english" ? "PPLT (English)" : bucket === "spanish" ? "Abogado (Spanish)" : "Combined";
+    const dyn = sectionWarnings(data, ["Overview"]);
+    const info: string[] = [];
+    info.push(
+      `"Leads" counts Meta lead-ad form submissions that landed in GHL, deduped within 3 days. "Referrals" = opps entering co-counsel / referral-broker pipelines. "Signed" = opps entering a signed stage. "Active Cases" counts only in-house active_practice pipelines (excludes co-counsel + brokers).`
+    );
+    if (o.reviews.lifetime === 0) {
+      info.push("Google Reviews showing zero — Reputation API scope likely missing on the GHL Private Integration Token. Regenerate with Reputation > Read.");
+    }
     return (
       <section id="overview">
         <SectionHeader
           title="Overview"
           subtitle={`${bucketLabel} · Last 30 days vs prior 30 days, last 7 days vs prior 7 days`}
         />
+        <SectionWarning tone="warn" items={dyn} />
+        <SectionWarning tone="info" items={info} />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={Users}
@@ -509,12 +568,14 @@ export default function DashboardView({
       };
     };
 
+    const dyn = sectionWarnings(data, ["KPI table"]);
     return (
       <section id="kpi">
         <SectionHeader
           title="KPIs"
           subtitle="Spanish vs English · current + previous month, current + last quarter"
         />
+        <SectionWarning tone="warn" items={dyn} />
         <div className="space-y-6">
           {showMonths && (
             <div>
@@ -650,12 +711,24 @@ export default function DashboardView({
     const showByArea = isSubVisible(data.visibility, "cost", "by_practice_area");
     const showByAreaState = isSubVisible(data.visibility, "cost", "by_area_state");
     const showPerAd = isSubVisible(data.visibility, "cost", "per_ad");
+    const dyn = sectionWarnings(data, ["Cost analytics", "Meta ad insights"]);
+    const info: string[] = [];
+    if (c.totalSpend === 0 && c.totalLeadsMeta === 0) {
+      info.push(
+        "Meta returning no data for this window. Most common cause: the Meta access token is rejected (\"API access blocked\"). Regenerate from System Users → Jaguar_Meta_Reporting → Generate token, then update Vercel env META_ACCESS_TOKEN."
+      );
+    }
+    info.push(
+      "Signed / Referred counts use cohort attribution: a sign-up in May from an April lead credits April spend. CPSC rows where the window ends < 60 days ago are flagged with an hourglass — more signs may still arrive."
+    );
     return (
       <section id="cost">
         <SectionHeader
           title="Ad Cost"
-          subtitle="Meta ad spend joined with GHL signed-case attribution (window-mismatch caveat: a May sign-up from an April ad won't be credited inside April)"
+          subtitle="Meta ad spend joined with GHL cohort attribution by lead-date"
         />
+        <SectionWarning tone="warn" items={dyn} />
+        <SectionWarning tone="info" items={info} />
         {showHeadline && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
@@ -1022,12 +1095,18 @@ export default function DashboardView({
       isSubVisible(data.visibility, "leads", "english_status") && bucket !== "spanish";
     const showEsStatus =
       isSubVisible(data.visibility, "leads", "spanish_status") && bucket !== "english";
+    const dyn = sectionWarnings(data, ["Spanish lead analytics", "English lead analytics"]);
+    const info: string[] = [
+      "Source Mix uses RAW GHL contact sources (every channel, no dedupe) so manual / referral / prior-client buckets remain visible here. The Lead Forms (Meta/GHL) total used elsewhere is a tighter subset.",
+    ];
     return (
       <section id="leads">
         <SectionHeader
           title="Lead Analytics"
-          subtitle="Sources, status mix, and conversion — current range"
+          subtitle="Sources and conversion — current range"
         />
+        <SectionWarning tone="warn" items={dyn} />
+        <SectionWarning tone="info" items={info} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {showEnSrc && (
             <LeadCard
@@ -1125,12 +1204,18 @@ export default function DashboardView({
         : bucket === "spanish"
           ? data.intakeTeamSpanish ?? data.intakeTeam ?? []
           : data.intakeTeam ?? [];
+    const dyn = sectionWarnings(data, ["Intake team"]);
+    const info: string[] = [
+      "Calls In / Calls Out / SMS / Avg Pickup columns are hidden — the conversation walk that powers them needs its own cron (Round 2). 'Referrals' here is opps assigned to the user that entered a co-counsel / referral / broker stage; if a teammate handed off, only the latest assignedTo is recorded.",
+    ];
     return (
       <section id="intake">
         <SectionHeader
           title="Intake Team"
           subtitle={`Per-member referrals + signed in ${data.range.label} · 30d/7d trends are rolling vs prior period · click any column to sort`}
         />
+        <SectionWarning tone="warn" items={dyn} />
+        <SectionWarning tone="info" items={info} />
         <IntakeTeamTable rows={rows} />
       </section>
     );
@@ -1232,12 +1317,18 @@ export default function DashboardView({
           ? data.casesSpanish ?? data.cases
           : data.cases;
     const brokers = view.referralBrokers;
+    const dyn = sectionWarnings(data, ["Case analytics"]);
+    const info: string[] = [
+      "All charts are RIGHT-NOW snapshots, not date-filtered. By Practice Area + By State count only in-house active cases. By Co-Counsel counts cases currently sitting in a co-counsel firm's pipeline. By Co-Counsel (Signed) is bounded by the 180-day opportunity walk — older signed-by-co-counsel cases roll off.",
+    ];
     return (
       <section id="cases">
         <SectionHeader
           title="Case Analytics"
           subtitle="Snapshot of active cases (not date-filtered)"
         />
+        <SectionWarning tone="warn" items={dyn} />
+        <SectionWarning tone="info" items={info} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {isSubVisible(data.visibility, "cases", "by_practice_area") && (
             <ChartCard title="By Practice Area">

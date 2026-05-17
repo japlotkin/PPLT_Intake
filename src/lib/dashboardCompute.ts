@@ -203,6 +203,15 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
     ),
   ]);
 
+  // costAnalytics() has its own internal `warnings` array (e.g. "Meta ad
+  // insights fetch failed: ..."). Bubble those up so the inline section
+  // warning banner in the UI can surface them.
+  if (cost && "warnings" in cost && Array.isArray((cost as { warnings?: string[] }).warnings)) {
+    for (const w of (cost as { warnings: string[] }).warnings) {
+      warnings.push(`Cost analytics: ${w}`);
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     range: { label: range.label, start: range.start.toISOString(), end: range.end.toISOString() },
