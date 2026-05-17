@@ -151,25 +151,28 @@ export async function costAnalytics(
   const contactStateA = buildContactStateIndex(contactsA, stateFieldIdsFor("abogado"));
   const contactStateP = buildContactStateIndex(contactsP, stateFieldIdsFor("pplt_leads"));
 
-  // 3. SAME-WINDOW ATTRIBUTION (matches Ads Manager mental model):
-  //    Spend in [start, end) / Signs that HAPPENED in [start, end).
-  //    The signed opp's original lead may pre-date the window -- we
-  //    intentionally mix this-window-spend with all-time leads here
-  //    because reconciliation against a monthly spreadsheet matters
-  //    more than a true CAC. Caveats are surfaced in the UI banner.
-  //
-  //    LEADS column still uses lead-date (opps created in the window):
-  //    that's how we tie Meta-leads count to GHL contacts.
+  // 3. DUAL ATTRIBUTION: compute BOTH lenses on the same pass.
+  //    Same-window: stage flipped to signed/referred IN [start, end).
+  //                 Matches Ads Manager. Reconciles to a monthly report.
+  //    Cohort:      lead came in [start, end), eventually reached
+  //                 signed/referred AT ANY POINT. True CAC view.
+  //    LEADS column always uses lead-date (cohort-style) so it ties
+  //    to Meta's lead-form count.
   const DAY_MS = 24 * 3600 * 1000;
+  const cohortMaturing = eMs > Date.now() - 60 * DAY_MS;
 
   interface AdAgg {
     leads: number;
+    // Same-window
     signed: number;
     referred: number;
     daysToSignedSum: number;
     daysToSignedCount: number;
     daysToReferredSum: number;
     daysToReferredCount: number;
+    // Cohort
+    signedCohort: number;
+    referredCohort: number;
   }
   const emptyAgg = (): AdAgg => ({
     leads: 0,
@@ -179,6 +182,8 @@ export async function costAnalytics(
     daysToSignedCount: 0,
     daysToReferredSum: 0,
     daysToReferredCount: 0,
+    signedCohort: 0,
+    referredCohort: 0,
   });
   const aggByAdId = new Map<string, AdAgg>();
 
@@ -192,48 +197,41 @@ export async function costAnalytics(
 
     const created = o.raw.createdAt ? Date.parse(o.raw.createdAt) : NaN;
     const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+    const leadInWindow =
+      Number.isFinite(created) && created >= sMs && created < eMs;
+    const signedNow = o.stageClass === "signed";
+    const referredNow =
+      o.stageClass === "referred_out" ||
+      o.pipelinePurpose === "co_counsel_tracking" ||
+      o.pipelinePurpose === "referral_broker";
+    const stageFlippedInWindow =
+      Number.isFinite(lastChange) && lastChange >= sMs && lastChange < eMs;
 
-    // LEADS: count opps whose lead came in during the window.
-    if (Number.isFinite(created) && created >= sMs && created < eMs) {
-      slot.leads += 1;
-    }
-    // SIGNED: count opps whose stage changed to signed during the window.
-    //         Lead may have come in earlier.
-    if (
-      o.stageClass === "signed" &&
-      Number.isFinite(lastChange) &&
-      lastChange >= sMs &&
-      lastChange < eMs
-    ) {
+    if (leadInWindow) slot.leads += 1;
+
+    // Same-window: stage flipped in the window.
+    if (signedNow && stageFlippedInWindow) {
       slot.signed += 1;
       if (Number.isFinite(created) && lastChange >= created) {
         slot.daysToSignedSum += (lastChange - created) / DAY_MS;
         slot.daysToSignedCount += 1;
       }
     }
-    // REFERRED: opps whose stage changed to referred-out / co-counsel /
-    //           referral-broker during the window.
-    if (
-      (o.stageClass === "referred_out" ||
-        o.pipelinePurpose === "co_counsel_tracking" ||
-        o.pipelinePurpose === "referral_broker") &&
-      Number.isFinite(lastChange) &&
-      lastChange >= sMs &&
-      lastChange < eMs
-    ) {
+    if (referredNow && stageFlippedInWindow) {
       slot.referred += 1;
       if (Number.isFinite(created) && lastChange >= created) {
         slot.daysToReferredSum += (lastChange - created) / DAY_MS;
         slot.daysToReferredCount += 1;
       }
     }
+    // Cohort: lead in window, current state is signed/referred.
+    if (leadInWindow && signedNow) slot.signedCohort += 1;
+    if (leadInWindow && referredNow) slot.referredCohort += 1;
 
     aggByAdId.set(adId, slot);
   }
 
-  // 4. Build per-ad rows. cohortMaturing kept on the row type for
-  //    backward compat with snapshots written by the old code; always
-  //    false now under same-window attribution.
+  // 4. Build per-ad rows (both lenses).
   const byAd: AdCostRow[] = adsRaw.map((ad) => {
     const practiceArea = classifyAdPracticeArea(ad);
     const agg = aggByAdId.get(ad.adId) ?? emptyAgg();
@@ -248,8 +246,11 @@ export async function costAnalytics(
       leadsMeta: ad.leads,
       signed: agg.signed,
       referred: agg.referred,
+      signedCohort: agg.signedCohort,
+      referredCohort: agg.referredCohort,
       cpl: ad.leads > 0 ? ad.spend / ad.leads : null,
       cpsc: agg.signed > 0 ? ad.spend / agg.signed : null,
+      cpscCohort: agg.signedCohort > 0 ? ad.spend / agg.signedCohort : null,
       avgDaysToSigned:
         agg.daysToSignedCount > 0
           ? agg.daysToSignedSum / agg.daysToSignedCount
@@ -258,7 +259,7 @@ export async function costAnalytics(
         agg.daysToReferredCount > 0
           ? agg.daysToReferredSum / agg.daysToReferredCount
           : null,
-      cohortMaturing: false,
+      cohortMaturing,
     };
   });
   byAd.sort((a, b) => b.spend - a.spend);
@@ -269,6 +270,8 @@ export async function costAnalytics(
     leads: number;
     signed: number;
     referred: number;
+    signedCohort: number;
+    referredCohort: number;
     adCount: number;
     dts: number;
     dtsCount: number;
@@ -278,13 +281,16 @@ export async function costAnalytics(
   const paAgg = new Map<string, PaAgg>();
   for (const row of byAd) {
     const slot = paAgg.get(row.practiceArea) ?? {
-      spend: 0, leads: 0, signed: 0, referred: 0, adCount: 0,
+      spend: 0, leads: 0, signed: 0, referred: 0,
+      signedCohort: 0, referredCohort: 0, adCount: 0,
       dts: 0, dtsCount: 0, dtr: 0, dtrCount: 0,
     };
     slot.spend += row.spend;
     slot.leads += row.leadsMeta;
     slot.signed += row.signed;
     slot.referred += row.referred;
+    slot.signedCohort += row.signedCohort;
+    slot.referredCohort += row.referredCohort;
     slot.adCount += 1;
     if (row.avgDaysToSigned !== null && row.signed > 0) {
       slot.dts += row.avgDaysToSigned * row.signed;
@@ -303,12 +309,15 @@ export async function costAnalytics(
       leadsMeta: v.leads,
       signed: v.signed,
       referred: v.referred,
+      signedCohort: v.signedCohort,
+      referredCohort: v.referredCohort,
       cpl: v.leads > 0 ? v.spend / v.leads : null,
       cpsc: v.signed > 0 ? v.spend / v.signed : null,
+      cpscCohort: v.signedCohort > 0 ? v.spend / v.signedCohort : null,
       avgDaysToSigned: v.dtsCount > 0 ? v.dts / v.dtsCount : null,
       avgDaysToReferred: v.dtrCount > 0 ? v.dtr / v.dtrCount : null,
       adCount: v.adCount,
-      cohortMaturing: false,
+      cohortMaturing,
     }))
     .sort((a, b) => b.spend - a.spend);
 
@@ -326,6 +335,8 @@ export async function costAnalytics(
     leads: number;
     signed: number;
     referred: number;
+    signedCohort: number;
+    referredCohort: number;
     dts: number;
     dtsCount: number;
     dtr: number;
@@ -344,19 +355,14 @@ export async function costAnalytics(
     const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
     const leadInWindow =
       Number.isFinite(created) && created >= sMs && created < eMs;
-    const signedInWindow =
-      o.stageClass === "signed" &&
-      Number.isFinite(lastChange) &&
-      lastChange >= sMs &&
-      lastChange < eMs;
-    const referredInWindow =
-      (o.stageClass === "referred_out" ||
-        o.pipelinePurpose === "co_counsel_tracking" ||
-        o.pipelinePurpose === "referral_broker") &&
-      Number.isFinite(lastChange) &&
-      lastChange >= sMs &&
-      lastChange < eMs;
-    if (!leadInWindow && !signedInWindow && !referredInWindow) continue;
+    const signedNow = o.stageClass === "signed";
+    const referredNow =
+      o.stageClass === "referred_out" ||
+      o.pipelinePurpose === "co_counsel_tracking" ||
+      o.pipelinePurpose === "referral_broker";
+    const stageFlippedInWindow =
+      Number.isFinite(lastChange) && lastChange >= sMs && lastChange < eMs;
+    if (!leadInWindow && !(stageFlippedInWindow && (signedNow || referredNow))) continue;
 
     const costPerLead = ad.spend / ad.leadsMeta;
     const stateIdx = o.locationKey === "abogado" ? contactStateA : contactStateP;
@@ -370,6 +376,7 @@ export async function costAnalytics(
     if (!slot) {
       slot = {
         area: areaKey, state, spend: 0, leads: 0, signed: 0, referred: 0,
+        signedCohort: 0, referredCohort: 0,
         dts: 0, dtsCount: 0, dtr: 0, dtrCount: 0,
       };
       byAreaStateMap.set(key, slot);
@@ -377,15 +384,17 @@ export async function costAnalytics(
     if (leadInWindow) {
       slot.leads += 1;
       slot.spend += costPerLead;
+      if (signedNow) slot.signedCohort += 1;
+      if (referredNow) slot.referredCohort += 1;
     }
-    if (signedInWindow) {
+    if (signedNow && stageFlippedInWindow) {
       slot.signed += 1;
       if (Number.isFinite(created) && lastChange >= created) {
         slot.dts += (lastChange - created) / DAY_MS;
         slot.dtsCount += 1;
       }
     }
-    if (referredInWindow) {
+    if (referredNow && stageFlippedInWindow) {
       slot.referred += 1;
       if (Number.isFinite(created) && lastChange >= created) {
         slot.dtr += (lastChange - created) / DAY_MS;
@@ -402,11 +411,14 @@ export async function costAnalytics(
       leads: r.leads,
       signed: r.signed,
       referred: r.referred,
+      signedCohort: r.signedCohort,
+      referredCohort: r.referredCohort,
       cpl: r.leads > 0 ? r.spend / r.leads : null,
       cpsc: r.signed > 0 ? r.spend / r.signed : null,
+      cpscCohort: r.signedCohort > 0 ? r.spend / r.signedCohort : null,
       avgDaysToSigned: r.dtsCount > 0 ? r.dts / r.dtsCount : null,
       avgDaysToReferred: r.dtrCount > 0 ? r.dtr / r.dtrCount : null,
-      cohortMaturing: false,
+      cohortMaturing,
     }))
     .sort((a, b) => b.spend - a.spend);
 

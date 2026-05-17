@@ -649,6 +649,8 @@ export default function DashboardView({
           leadsMeta: number;
           signed: number;
           referred: number;
+          signedCohort: number;
+          referredCohort: number;
           adCount: number;
           dts: number;
           dtsCount: number;
@@ -659,13 +661,16 @@ export default function DashboardView({
       for (const ad of byAd) {
         const key = ad.practiceArea === "unknown" ? "Unclassified" : ad.practiceArea;
         const slot = paMap.get(key) ?? {
-          area: key, spend: 0, leadsMeta: 0, signed: 0, referred: 0, adCount: 0,
+          area: key, spend: 0, leadsMeta: 0, signed: 0, referred: 0,
+          signedCohort: 0, referredCohort: 0, adCount: 0,
           dts: 0, dtsCount: 0, dtr: 0, dtrCount: 0,
         };
         slot.spend += ad.spend;
         slot.leadsMeta += ad.leadsMeta;
         slot.signed += ad.signed;
         slot.referred += ad.referred;
+        slot.signedCohort += ad.signedCohort;
+        slot.referredCohort += ad.referredCohort;
         slot.adCount += 1;
         if (ad.avgDaysToSigned !== null && ad.signed > 0) {
           slot.dts += ad.avgDaysToSigned * ad.signed;
@@ -684,9 +689,12 @@ export default function DashboardView({
           leadsMeta: r.leadsMeta,
           signed: r.signed,
           referred: r.referred,
+          signedCohort: r.signedCohort,
+          referredCohort: r.referredCohort,
           adCount: r.adCount,
           cpl: r.leadsMeta > 0 ? r.spend / r.leadsMeta : null,
           cpsc: r.signed > 0 ? r.spend / r.signed : null,
+          cpscCohort: r.signedCohort > 0 ? r.spend / r.signedCohort : null,
           avgDaysToSigned: r.dtsCount > 0 ? r.dts / r.dtsCount : null,
           avgDaysToReferred: r.dtrCount > 0 ? r.dtr / r.dtrCount : null,
           cohortMaturing: rawCost.byPracticeArea[0]?.cohortMaturing ?? false,
@@ -726,7 +734,7 @@ export default function DashboardView({
       );
     }
     info.push(
-      "Same-window attribution: Spend in the window divided by Signs / Referrals that HAPPENED in the same window (regardless of when the lead originally came in). Matches how Ads Manager reports it. The 'Leads' column still uses lead-date so it ties to Meta's lead-form count. d→Sign / d→Ref are avg days between createdAt and the date the stage flipped — useful for understanding cycle time."
+      "Two CPSC lenses: 'Signed (window)' and 'CPSC (window)' count signs that HAPPENED in the window, regardless of when the lead came in — matches Ads Manager and reconciles to monthly totals. 'Signed (cohort)' and 'CPSC (cohort)' count signs from leads that ARRIVED in the window — true CAC view, but maturing: for a window that ends < 60 days ago, more signs may still come in. The Leads column always uses lead-date so it ties to Meta's lead-form count. d→Sign / d→Ref are avg days between createdAt and the day the stage flipped."
     );
     return (
       <section id="cost">
@@ -895,7 +903,8 @@ export default function DashboardView({
     fmtUsd2: (n: number | null) => string;
   }) {
     type Col =
-      | "area" | "state" | "cpl" | "cpsc" | "spend" | "leads" | "signed" | "referred"
+      | "area" | "state" | "cpl" | "cpsc" | "cpscCohort"
+      | "spend" | "leads" | "signed" | "signedCohort" | "referred"
       | "avgDaysToSigned" | "avgDaysToReferred";
     const { sorted, sortKey, sortDir, onSort } = useSortable<AreaStateCostRow, Col>(
       rows,
@@ -905,7 +914,7 @@ export default function DashboardView({
     );
     return (
       <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-        <table className="w-full text-sm min-w-[1100px]">
+        <table className="w-full text-sm min-w-[1300px]">
           <thead className="bg-slate-50/60">
             <tr className="border-b border-slate-200">
               <SortHeader label="Area" columnKey="area" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" className="px-5" />
@@ -913,17 +922,19 @@ export default function DashboardView({
               <SortHeader label="Spend" columnKey="spend" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="Leads" columnKey="leads" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="Referred" columnKey="referred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
-              <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Signed (window)" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Signed (cohort)" columnKey="signedCohort" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="d→Ref" columnKey="avgDaysToReferred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="d→Sign" columnKey="avgDaysToSigned" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
-              <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPSC (window)" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPSC (cohort)" columnKey="cpscCohort" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-5 py-6 text-center text-slate-400 text-sm">
+                <td colSpan={12} className="px-5 py-6 text-center text-slate-400 text-sm">
                   No (area × state) buckets in this window. Most likely the contacts coming from these ads don&apos;t have State (Jurisdiction) populated.
                 </td>
               </tr>
@@ -935,12 +946,12 @@ export default function DashboardView({
                 <td className="px-5 py-2.5 text-right tabular-nums">{r.leads.toLocaleString()}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{r.referred.toLocaleString()}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{r.signed.toLocaleString()}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.signedCohort.toLocaleString()}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToReferred === null ? "—" : `${r.avgDaysToReferred.toFixed(1)}d`}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToSigned === null ? "—" : `${r.avgDaysToSigned.toFixed(1)}d`}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
-                <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">
-                  {fmtUsd2(r.cpsc)}
-                </td>
+                <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{fmtUsd2(r.cpscCohort)}</td>
               </tr>
             ))}
           </tbody>
@@ -960,7 +971,8 @@ export default function DashboardView({
   }) {
     type Col =
       | "area" | "adCount" | "spend" | "leadsMeta" | "signed" | "referred"
-      | "cpl" | "cpsc" | "avgDaysToSigned" | "avgDaysToReferred";
+      | "signedCohort" | "cpl" | "cpsc" | "cpscCohort"
+      | "avgDaysToSigned" | "avgDaysToReferred";
     const { sorted, sortKey, sortDir, onSort } = useSortable<PracticeAreaCostRow, Col>(
       rows,
       "spend",
@@ -969,7 +981,7 @@ export default function DashboardView({
     );
     return (
       <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-        <table className="w-full text-sm min-w-[1100px]">
+        <table className="w-full text-sm min-w-[1300px]">
           <thead className="bg-slate-50/60">
             <tr className="border-b border-slate-200">
               <SortHeader label="Practice area" columnKey="area" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" className="px-5" />
@@ -977,16 +989,18 @@ export default function DashboardView({
               <SortHeader label="Spend" columnKey="spend" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="Leads" columnKey="leadsMeta" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="Referred" columnKey="referred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
-              <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Signed (window)" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="Signed (cohort)" columnKey="signedCohort" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="d→Ref" columnKey="avgDaysToReferred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="d→Sign" columnKey="avgDaysToSigned" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
               <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
-              <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPSC (window)" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
+              <SortHeader label="CPSC (cohort)" columnKey="cpscCohort" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-5" />
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 ? (
-              <tr><td colSpan={10} className="px-5 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
+              <tr><td colSpan={12} className="px-5 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
             ) : sorted.map((r) => (
               <tr key={r.area} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                 <td className="px-5 py-2.5 font-medium text-slate-800">{r.area}</td>
@@ -995,12 +1009,12 @@ export default function DashboardView({
                 <td className="px-5 py-2.5 text-right tabular-nums">{r.leadsMeta.toLocaleString()}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{r.referred.toLocaleString()}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{r.signed.toLocaleString()}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.signedCohort.toLocaleString()}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToReferred === null ? "—" : `${r.avgDaysToReferred.toFixed(1)}d`}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToSigned === null ? "—" : `${r.avgDaysToSigned.toFixed(1)}d`}</td>
                 <td className="px-5 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
-                <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">
-                  {fmtUsd2(r.cpsc)}
-                </td>
+                <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+                <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{fmtUsd2(r.cpscCohort)}</td>
               </tr>
             ))}
           </tbody>
@@ -1020,8 +1034,9 @@ export default function DashboardView({
   }) {
     type Col =
       | "adName" | "campaignName" | "account" | "practiceArea"
-      | "spend" | "leadsMeta" | "signed" | "referred"
-      | "cpl" | "cpsc" | "avgDaysToSigned" | "avgDaysToReferred";
+      | "spend" | "leadsMeta" | "signed" | "referred" | "signedCohort"
+      | "cpl" | "cpsc" | "cpscCohort"
+      | "avgDaysToSigned" | "avgDaysToReferred";
     const { sorted, sortKey, sortDir, onSort } = useSortable<AdCostRow, Col>(
       rows,
       "spend",
@@ -1030,7 +1045,7 @@ export default function DashboardView({
     );
     return (
       <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-        <table className="w-full text-sm min-w-[1300px]">
+        <table className="w-full text-sm min-w-[1500px]">
           <thead className="bg-slate-50/60">
             <tr className="border-b border-slate-200">
               <SortHeader label="Ad" columnKey="adName" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
@@ -1040,16 +1055,18 @@ export default function DashboardView({
               <SortHeader label="Spend" columnKey="spend" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
               <SortHeader label="Leads" columnKey="leadsMeta" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
               <SortHeader label="Referred" columnKey="referred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
-              <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="Signed (window)" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="Signed (cohort)" columnKey="signedCohort" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
               <SortHeader label="d→Ref" columnKey="avgDaysToReferred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
               <SortHeader label="d→Sign" columnKey="avgDaysToSigned" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
               <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
-              <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="CPSC (window)" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+              <SortHeader label="CPSC (cohort)" columnKey="cpscCohort" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 ? (
-              <tr><td colSpan={12} className="px-4 py-6 text-center text-slate-400 text-sm">No ads with spend in this window.</td></tr>
+              <tr><td colSpan={14} className="px-4 py-6 text-center text-slate-400 text-sm">No ads with spend in this window.</td></tr>
             ) : sorted.map((r, i) => (
               <tr key={r.adId + i} className={`border-t border-slate-100 hover:bg-slate-50/60 transition-colors ${i % 2 === 1 ? "bg-slate-50/30" : ""}`}>
                 <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={r.adName}>{r.adName}</td>
@@ -1064,12 +1081,12 @@ export default function DashboardView({
                 <td className="px-4 py-2.5 text-right tabular-nums">{r.leadsMeta}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{r.referred}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{r.signed}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{r.signedCohort}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToReferred === null ? "—" : `${r.avgDaysToReferred.toFixed(1)}d`}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{r.avgDaysToSigned === null ? "—" : `${r.avgDaysToSigned.toFixed(1)}d`}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">
-                  {fmtUsd2(r.cpsc)}
-                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">{fmtUsd2(r.cpsc)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{fmtUsd2(r.cpscCohort)}</td>
               </tr>
             ))}
           </tbody>

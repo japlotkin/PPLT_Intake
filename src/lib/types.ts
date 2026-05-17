@@ -196,6 +196,15 @@ export interface CaseAnalytics {
 }
 
 // ----- cost analytics -----
+// Two attribution lenses on the same data:
+//   Same-window  : counts the SIGN/REFERRAL EVENT happening in the window
+//                  (regardless of when the lead originally came in).
+//                  Matches how Ads Manager reports it.
+//   Cohort        : counts the LEAD coming in during the window; only credits
+//                  signs/refs if they happen AFTER createdAt (look-ahead is
+//                  bounded by the 180-day opp walk).
+//                  cohortMaturing=true means the window ends <60d ago and
+//                  more sign-ups may still arrive.
 export interface AdCostRow {
   adId: string;
   adName: string;
@@ -205,17 +214,23 @@ export interface AdCostRow {
   practiceArea: string;
   spend: number;
   leadsMeta: number;
-  /** Cohort: opps with utmAdId=adId AND createdAt in window AND ever reached a signed stage */
+  /** Same-window: opp's stage flipped to signed inside the window. */
   signed: number;
-  /** Cohort: same, but for referred-out/co-counsel pipelines */
+  /** Same-window: opp's stage flipped to referred / co-counsel inside the window. */
   referred: number;
+  /** Cohort: opp's lead came in window AND eventually reached signed. */
+  signedCohort: number;
+  /** Cohort: opp's lead came in window AND eventually reached referred. */
+  referredCohort: number;
   cpl: number | null;
   cpsc: number | null;
-  /** Avg (signedAt - createdAt) in days, for the signed cohort */
+  /** Cohort CPSC: spend / signedCohort. */
+  cpscCohort: number | null;
+  /** Avg (lastChangeAt - createdAt) for the same-window signed set. */
   avgDaysToSigned: number | null;
-  /** Avg (referredAt - createdAt) in days, for the referred cohort */
+  /** Avg (lastChangeAt - createdAt) for the same-window referred set. */
   avgDaysToReferred: number | null;
-  /** True when the lead-cohort window ends < 60 days ago and signs may still arrive */
+  /** True when window ends < 60 days ago and the cohort numbers are still maturing. */
   cohortMaturing: boolean;
 }
 
@@ -225,8 +240,11 @@ export interface PracticeAreaCostRow {
   leadsMeta: number;
   signed: number;
   referred: number;
+  signedCohort: number;
+  referredCohort: number;
   cpl: number | null;
   cpsc: number | null;
+  cpscCohort: number | null;
   avgDaysToSigned: number | null;
   avgDaysToReferred: number | null;
   adCount: number;
@@ -238,10 +256,13 @@ export interface AreaStateCostRow {
   state: string;
   spend: number;       // attributed via spend / Meta-leads per ad
   leads: number;       // GHL opps with utmAdId AND createdAt in window
-  signed: number;      // cohort: same leads that ever reached signed
-  referred: number;    // cohort: same leads that ever reached referred-out / co-counsel
+  signed: number;
+  referred: number;
+  signedCohort: number;
+  referredCohort: number;
   cpl: number | null;
   cpsc: number | null;
+  cpscCohort: number | null;
   avgDaysToSigned: number | null;
   avgDaysToReferred: number | null;
   cohortMaturing: boolean;
