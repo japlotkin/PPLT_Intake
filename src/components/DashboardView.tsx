@@ -1420,7 +1420,7 @@ export default function DashboardView({
     const info: string[] = [
       syncStatus,
       "Referrals / Signed attribution: the rep who initiated the action gets credit, defined as the intake user who sent the most recent outbound call/SMS to that contact in the 14 days BEFORE the opp's stage flipped to referred / signed. opp.assignedTo is ignored — this firm's GHL setup doesn't populate it reliably.",
-      "Calls Out + SMS are fully attributable: 100% of outbound calls and most outbound SMS carry the rep's userId. Calls In is sparse: GHL only attaches a userId to ~5% of inbound calls (the rest come in as unattributed system records, with a chunk also handled by the VOICE_AI agent). If you need per-rep inbound attribution, that needs a different signal (e.g., the rep who responded to the contact next).",
+      "Calls Made = every outbound call the rep dialed. Calls Connected = subset that actually picked up (meta.call.status === 'completed' or duration > 0). Pickup rate = Connected / Made. SMS counts every TYPE_SMS + TYPE_CUSTOM_SMS that carried this rep's userId. Inbound calls are NOT in this view because GHL only attaches a userId to ~5% of them (the rest land as unattributed system records).",
     ];
     return (
       <section id="intake">
@@ -1440,8 +1440,8 @@ export default function DashboardView({
       | "name"
       | "referrals"
       | "signedFromReferrals"
-      | "callsInbound"
-      | "callsOutbound"
+      | "callsOutbound"   // sort by Calls Made
+      | "callsAnswered"   // sort by Calls Connected (derived; see getCellValue below)
       | "sms"
       | "avgPickupSeconds"
       | "referrals30"
@@ -1487,8 +1487,8 @@ export default function DashboardView({
                 <SortHeader label="Member" columnKey="name" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="left" />
                 <SortHeader label="Referrals" columnKey="referrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Signed" columnKey="signedFromReferrals" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
-                <SortHeader label="Calls In" columnKey="callsInbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
-                <SortHeader label="Calls Out" columnKey="callsOutbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Calls Made" columnKey="callsOutbound" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
+                <SortHeader label="Calls Connected" columnKey="callsAnswered" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="SMS" columnKey="sms" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Avg call" columnKey="avgPickupSeconds" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
                 <SortHeader label="Ref 30d" columnKey="referrals30" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" />
@@ -1517,9 +1517,9 @@ export default function DashboardView({
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{m.referrals}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{m.signedFromReferrals}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{m.callsInbound}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{m.callsOutbound}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{m.sms}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.callsOutbound.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">{m.callsAnswered.toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.sms.toLocaleString()}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-600">
                     {fmtSeconds(m.avgPickupSeconds)}
                   </td>

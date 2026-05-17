@@ -169,6 +169,10 @@ export interface IntakeMemberMetrics {
   signedFromReferrals: number;
   callsInbound: number;
   callsOutbound: number;
+  /** Subset of inbound+outbound where the call actually connected
+   *  (meta.call.status === "completed" or callDuration > 0). Shown as
+   *  "Calls Connected" in the UI. */
+  callsAnswered: number;
   sms: number;
   avgPickupSeconds: number | null;
   // Rolling windows (matches Overview): last 30 days vs prior 30, last 7 vs prior 7.

@@ -239,6 +239,7 @@ export async function intakeTeamMetrics(
       signedFromReferrals: rangeStats.signedFromReferrals,
       callsInbound: inbound,
       callsOutbound: outbound,
+      callsAnswered: answered,
       sms,
       avgPickupSeconds,
       referrals30: delta(cur30.referrals, prev30Stats.referrals),

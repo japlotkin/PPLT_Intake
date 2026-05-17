@@ -273,6 +273,7 @@ function intakeRow(
     signedFromReferrals: signed,
     callsInbound: cIn,
     callsOutbound: cOut,
+    callsAnswered: Math.round(cOut * 0.7) + Math.round(cIn * 0.85),
     sms,
     avgPickupSeconds: 12 + Math.random() * 6,
     referrals30: { current: referrals, previous: Math.max(0, referrals - 4), pctChange: 18.2, direction: "up" as const },
