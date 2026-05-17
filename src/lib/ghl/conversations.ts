@@ -21,6 +21,7 @@ import { getV2, GhlAuth } from "./client";
 interface ConvSearchResp {
   conversations: Array<{
     id: string;
+    contactId?: string;
     lastMessageDate?: number;
     dateUpdated?: number;
   }>;
@@ -65,9 +66,26 @@ export interface UserDailyActivity {
   sms: Record<string, SmsDayBucket>;
 }
 
+/** A single intake-user-attributed message event on a contact's timeline. */
+export interface ContactMessageEvent {
+  /** GHL user id of the rep who sent the message. */
+  userId: string;
+  /** Epoch-ms timestamp of the message. */
+  t: number;
+  /** "inbound" = contact -> firm. "outbound" = firm -> contact. */
+  direction: "inbound" | "outbound";
+  /** TYPE_CALL or TYPE_SMS. */
+  type: "call" | "sms";
+}
+
 export interface ConversationActivityByDay {
   /** GHL userId -> per-day buckets. */
   byUser: Map<string, UserDailyActivity>;
+  /** contactId -> chronological timeline of intake-user-attributed messages.
+   *  Used downstream to attribute a stage change ("who initiated the
+   *  referral / sign-up") to the rep who sent the latest outbound
+   *  message before the stage flipped. */
+  byContact: Map<string, ContactMessageEvent[]>;
   /** Calls + SMS we couldn't attribute to a user (missing userId on message). */
   unassignedCalls: number;
   unassignedSms: number;
@@ -115,7 +133,9 @@ export async function conversationsActivityByDay(
   const endMs = end.getTime();
 
   // Step 1: find conversations active in the window.
-  const convIds: string[] = [];
+  // Track contactId per conversation so we can build a contact-keyed
+  // message timeline downstream.
+  const convs: Array<{ id: string; contactId: string | undefined }> = [];
   let startAfterDate: number | undefined;
   let startAfterId: string | undefined;
   let page = 0;
@@ -131,30 +151,34 @@ export async function conversationsActivityByDay(
     if (startAfterDate !== undefined) q.startAfterDate = startAfterDate;
     if (startAfterId) q.startAfterId = startAfterId;
     const resp: ConvSearchResp = await getV2(auth, "/conversations/search", q);
-    const convs = resp.conversations ?? [];
-    if (!convs.length) break;
+    const list = resp.conversations ?? [];
+    if (!list.length) break;
     let stop = false;
-    for (const c of convs) {
+    for (const c of list) {
       const lmd = c.lastMessageDate ?? c.dateUpdated ?? 0;
       if (lmd < startMs) {
         stop = true;
         break;
       }
-      convIds.push(c.id);
+      convs.push({ id: c.id, contactId: c.contactId });
     }
-    if (stop || convs.length < 100) break;
-    const last = convs[convs.length - 1];
+    if (stop || list.length < 100) break;
+    const last = list[list.length - 1];
     startAfterDate = last.lastMessageDate ?? last.dateUpdated;
     startAfterId = last.id;
   }
 
-  // Step 2: walk messages in each, bucketing by (userId, UTC day).
+  // Step 2: walk messages in each, bucketing by (userId, UTC day) AND
+  // building a per-contact message timeline.
   const byUser = new Map<string, UserDailyActivity>();
+  const byContact = new Map<string, ContactMessageEvent[]>();
   let unassignedCalls = 0;
   let unassignedSms = 0;
   let messagesScanned = 0;
 
-  for (const cid of convIds) {
+  for (const conv of convs) {
+    const cid = conv.id;
+    const contactId = conv.contactId;
     let lastMessageId: string | undefined;
     let msgPage = 0;
     while (true) {
@@ -184,14 +208,18 @@ export async function conversationsActivityByDay(
         }
         if (t >= endMs) continue;
         const dateKey = utcDateKey(t);
-        if (m.messageType === "TYPE_CALL") {
+        const direction: "inbound" | "outbound" | null =
+          m.direction === "inbound" ? "inbound" : m.direction ? "outbound" : null;
+        const isCall = m.messageType === "TYPE_CALL";
+        const isSms = m.messageType === "TYPE_SMS";
+        if (isCall) {
           if (!m.userId) {
             unassignedCalls++;
             continue;
           }
           const u = ensureUser(byUser, m.userId);
           const bucket = ensureCallBucket(u, dateKey);
-          if (m.direction === "inbound") bucket.inbound++;
+          if (direction === "inbound") bucket.inbound++;
           else bucket.outbound++;
           const status = m.meta?.callStatus?.toLowerCase();
           const dur = Number(m.callDuration ?? 0) || 0;
@@ -199,15 +227,31 @@ export async function conversationsActivityByDay(
             bucket.answered++;
             bucket.durationSeconds += dur;
           }
-        } else if (m.messageType === "TYPE_SMS") {
+        } else if (isSms) {
           if (!m.userId) {
             unassignedSms++;
             continue;
           }
           const u = ensureUser(byUser, m.userId);
           const bucket = ensureSmsBucket(u, dateKey);
-          if (m.direction === "inbound") bucket.inbound++;
+          if (direction === "inbound") bucket.inbound++;
           else bucket.outbound++;
+        }
+        // Record on the per-contact timeline so downstream code can
+        // attribute stage-change events to the rep who last touched
+        // the contact.
+        if (contactId && m.userId && direction && (isCall || isSms)) {
+          let timeline = byContact.get(contactId);
+          if (!timeline) {
+            timeline = [];
+            byContact.set(contactId, timeline);
+          }
+          timeline.push({
+            userId: m.userId,
+            t,
+            direction,
+            type: isCall ? "call" : "sms",
+          });
         }
       }
       if (stop || !wrapper.nextPage) break;
@@ -216,11 +260,18 @@ export async function conversationsActivityByDay(
     }
   }
 
+  // Sort each contact's timeline ascending so attribution lookups can
+  // do a quick "find last event before T" walk from the end.
+  for (const timeline of byContact.values()) {
+    timeline.sort((a, b) => a.t - b.t);
+  }
+
   return {
     byUser,
+    byContact,
     unassignedCalls,
     unassignedSms,
-    conversationsScanned: convIds.length,
+    conversationsScanned: convs.length,
     messagesScanned,
   };
 }

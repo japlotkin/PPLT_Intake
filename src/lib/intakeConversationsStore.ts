@@ -49,12 +49,27 @@ export interface UserDailyActivity {
   sms: Record<string, DailySmsBucket>;
 }
 
+/** One message-event on a contact's timeline; used for stage-change attribution. */
+export interface ContactMessageEvent {
+  /** GHL user id of the intake rep who sent / handled the message. */
+  userId: string;
+  /** Epoch-ms. */
+  t: number;
+  /** "inbound" = contact -> firm. "outbound" = firm -> contact. */
+  direction: "inbound" | "outbound";
+  type: "call" | "sms";
+}
+
 export interface IntakeConversationsSnapshot {
   syncedAt: string;
   startISO: string;
   endISO: string;
   /** userId -> per-day buckets. userId is the GHL user id within this location. */
   byUser: Record<string, UserDailyActivity>;
+  /** contactId -> chronological message timeline. Used by intakeTeam.ts
+   *  to resolve "which intake rep last touched this contact before the
+   *  opp's stage flipped to referred / signed". */
+  byContact: Record<string, ContactMessageEvent[]>;
   /** Calls/SMS we couldn't attribute to a user (caller wasn't an intake user, etc.). */
   unassignedCalls: number;
 }
@@ -103,6 +118,35 @@ export async function writeIntakeConversations(
 /** YYYY-MM-DD in UTC. */
 export function utcDateKey(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * Look up the intake rep who most recently sent an OUTBOUND message to a
+ * contact in the N days before the stage flipped. That rep is credited
+ * with triggering the stage change (referral / sign-up).
+ *
+ * Returns null if no matching event in the window.
+ */
+const ATTRIBUTION_WINDOW_DAYS = 14;
+const ATTRIBUTION_WINDOW_MS = ATTRIBUTION_WINDOW_DAYS * 24 * 3600 * 1000;
+
+export function attributeStageChange(
+  timeline: ContactMessageEvent[] | undefined,
+  stageChangeMs: number,
+  intakeUserIds: Set<string>
+): string | null {
+  if (!timeline || timeline.length === 0) return null;
+  const cutoff = stageChangeMs - ATTRIBUTION_WINDOW_MS;
+  // Walk from the end (latest first) — first match wins.
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const e = timeline[i];
+    if (e.t > stageChangeMs) continue;
+    if (e.t < cutoff) break;
+    if (e.direction !== "outbound") continue;
+    if (!intakeUserIds.has(e.userId)) continue;
+    return e.userId;
+  }
+  return null;
 }
 
 /** Aggregate per-user activity within [startMs, endMs) by summing daily buckets. */

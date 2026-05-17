@@ -1247,7 +1247,8 @@ export default function DashboardView({
           : data.intakeTeam ?? [];
     const dyn = sectionWarnings(data, ["Intake team"]);
     const info: string[] = [
-      "Calls In / Calls Out / SMS / Avg Call come from a separate 4-hourly cron (/api/sync/intake) that walks GHL conversations + messages per day. Numbers slice to the date picker. If all four columns show zeros the cron hasn't run yet. 'Referrals' = opps assigned to the user that entered a co-counsel / referral / broker stage; if a teammate handed off, only the latest assignedTo is recorded.",
+      "All columns come from the 4-hourly /api/sync/intake cron (GHL conversation + message walk). If everything shows zeros the cron hasn't run yet (first tick after deploy can take up to 4 hours).",
+      "Referrals / Signed attribution: the rep who initiated the action gets credit, defined as the intake user who sent the most recent outbound call/SMS to that contact in the 14 days BEFORE the opp's stage flipped to referred / signed. opp.assignedTo is ignored — this firm's GHL setup doesn't populate it reliably.",
     ];
     return (
       <section id="intake">

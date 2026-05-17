@@ -22,6 +22,7 @@ import {
   WINDOW_DAYS,
   type IntakeConversationsSnapshot,
   type UserDailyActivity,
+  type ContactMessageEvent,
 } from "@/lib/intakeConversationsStore";
 import { env } from "@/lib/env";
 
@@ -91,18 +92,32 @@ async function runOneLocation(
     }
     unassignedCalls = activity.unassignedCalls;
 
+    // Trim contact timelines to ONLY intake-user events (drops noise and
+    // shrinks the snapshot size by a lot). Resolver expects each event's
+    // userId to be in intakeIds anyway.
+    const byContact: Record<string, ContactMessageEvent[]> = {};
+    let contactsWithEvents = 0;
+    for (const [contactId, timeline] of activity.byContact) {
+      const filtered = timeline.filter((e) => intakeIds.has(e.userId));
+      if (filtered.length === 0) continue;
+      byContact[contactId] = filtered;
+      contactsWithEvents++;
+    }
+
     const snapshot: IntakeConversationsSnapshot = {
       syncedAt: new Date().toISOString(),
       startISO: start.toISOString(),
       endISO: end.toISOString(),
       byUser,
+      byContact,
       unassignedCalls,
     };
     await writeIntakeConversations(locationKey, snapshot);
 
     console.log(
       `[/api/sync/intake] ${locationKey}: scanned ${activity.conversationsScanned} conversations, ` +
-        `${activity.messagesScanned} messages, ${Object.keys(byUser).length} intake users`
+        `${activity.messagesScanned} messages, ${Object.keys(byUser).length} intake users, ` +
+        `${contactsWithEvents} contacts on the attribution timeline`
     );
 
     return {
