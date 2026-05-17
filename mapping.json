@@ -545,7 +545,7 @@
             {
               "id": "367fcb15-7f9e-4a4c-8277-86390094ea4d",
               "name": "Pinder Plotkin (MD)",
-              "class": "active",
+              "class": "signed",
               "position": 8
             },
             {
@@ -2427,7 +2427,7 @@
             {
               "id": "9b6e0c8a-e031-4a2e-88b4-6fe20c73480b",
               "name": "Pinder Plotkin (MD) ",
-              "class": "active",
+              "class": "signed",
               "position": 8
             },
             {
@@ -2580,7 +2580,7 @@
         },
         {
           "id": "cs7wKyFrooyjhGuX5odO",
-          "name": "Community Collaboration \u2013 Marta",
+          "name": "Community Collaboration – Marta",
           "purpose": "channel",
           "practice_area": null,
           "co_counsel_firm": null,
@@ -2612,13 +2612,13 @@
             },
             {
               "id": "d466b06a-1338-4a7e-8a91-9082388b5d90",
-              "name": "Closed \u2013 Completed",
+              "name": "Closed – Completed",
               "class": "active",
               "position": 4
             },
             {
               "id": "e6c16e0f-dcdf-4c72-b26c-b64d0be85684",
-              "name": "Closed \u2013 No Response / Not a Fit",
+              "name": "Closed – No Response / Not a Fit",
               "class": "active",
               "position": 5
             }
@@ -3336,7 +3336,7 @@
         },
         {
           "id": "fDxHTZKAEYxUFwXWIN44",
-          "name": "accidente de cami\u00f3n",
+          "name": "accidente de camión",
           "class": null
         },
         {
@@ -4631,7 +4631,7 @@
         },
         {
           "id": "p2kcoaETOb0lon7fkkUt",
-          "name": "santa \u2013 screenshot received\u201d",
+          "name": "santa – screenshot received”",
           "class": null
         },
         {
@@ -5176,7 +5176,7 @@
         },
         {
           "id": "LsqzdD9JZaPaf2imhPV4",
-          "name": "\u201cquick call from",
+          "name": "“quick call from",
           "class": null
         }
       ],
@@ -5211,14 +5211,14 @@
         },
         {
           "id": "17iycIGlIdjwADXIm0vX",
-          "name": "\u00bfPor cu\u00e1nto tiempo usaste estos productos?",
+          "name": "¿Por cuánto tiempo usaste estos productos?",
           "fieldKey": "contact.por_cunto_tiempo_usaste_estos_productos",
           "dataType": "LARGE_TEXT",
           "kind": null
         },
         {
           "id": "2EO7iBGCdGkHSZuNkMAl",
-          "name": "\u00bfCu\u00e1nto dinero te deben? (Si lo sabes)",
+          "name": "¿Cuánto dinero te deben? (Si lo sabes)",
           "fieldKey": "contact.cunto_dinero_te_deben_si_lo_sabes",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -5253,7 +5253,7 @@
         },
         {
           "id": "38gAxas5dyEdMMyz1mtF",
-          "name": "\u00bfEn qu\u00e9 estado trabajas?",
+          "name": "¿En qué estado trabajas?",
           "fieldKey": "contact.en_qu_estado_trabajas",
           "dataType": "TEXT",
           "kind": null
@@ -5288,7 +5288,7 @@
         },
         {
           "id": "3ifl8dFzl5BSJqLLjSZ6",
-          "name": "\u00bfEn qu\u00e9 a\u00f1o se hizo el diagn\u00f3stico?",
+          "name": "¿En qué año se hizo el diagnóstico?",
           "fieldKey": "contact.en_que_ano_se_hizo_el_diagnostico",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -5323,14 +5323,14 @@
         },
         {
           "id": "4Y8Wu0CzY0YoYy3PD8uT",
-          "name": "\u00bfTe lastimaste en una obra de construcci\u00f3n?",
+          "name": "¿Te lastimaste en una obra de construcción?",
           "fieldKey": "contact.te_lastimaste_en_una_obra_de_construccin",
           "dataType": "TEXT",
           "kind": null
         },
         {
           "id": "4ee0sOibTPpHo3dKkUA0",
-          "name": "\u00bfQu\u00e9 tipo de veh\u00edculo comercial estuvo involucrado en su accidente?",
+          "name": "¿Qué tipo de vehículo comercial estuvo involucrado en su accidente?",
           "fieldKey": "contact.qu_tipo_de_vehculo_comercial_estuvo_involucrado_en_su_accidente",
           "dataType": "TEXT",
           "kind": null
@@ -5379,7 +5379,7 @@
         },
         {
           "id": "5ZVzzaPmpoTW10EFYpxy",
-          "name": "\u00bfEst\u00e1s trabajando actualmente?",
+          "name": "¿Estás trabajando actualmente?",
           "fieldKey": "contact.ests_trabajando_actualmente",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -5393,7 +5393,7 @@
         },
         {
           "id": "5rSXOY9FlQHtoVSv7xfa",
-          "name": "Fecha de la lesi\u00f3n",
+          "name": "Fecha de la lesión",
           "fieldKey": "contact.fecha_de_la_lesin",
           "dataType": "TEXT",
           "kind": null
@@ -5421,7 +5421,7 @@
         },
         {
           "id": "6AtzE5rf0DoiSO9AbC99",
-          "name": "\u00bfVives en Estados Unidos?",
+          "name": "¿Vives en Estados Unidos?",
           "fieldKey": "contact.vives_en_estados_unidos",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -5512,7 +5512,7 @@
         },
         {
           "id": "9ZZDNJrOTd0n9RAxFKyV",
-          "name": "\u00bfQu\u00e9 caus\u00f3 la lesi\u00f3n? (c\u00f3mo te lesionaste)",
+          "name": "¿Qué causó la lesión? (cómo te lesionaste)",
           "fieldKey": "contact.qu_caus_la_lesin_cmo_te_lesionaste",
           "dataType": "TEXT",
           "kind": null
@@ -5673,7 +5673,7 @@
         },
         {
           "id": "H9rYI24TUZScVNME9DLP",
-          "name": "\u00bfEn qu\u00e9 estado pas\u00f3 el accidente? (9.12.24)",
+          "name": "¿En qué estado pasó el accidente? (9.12.24)",
           "fieldKey": "contact.en_qu_estado_pas_el_accidente_91224",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -5729,7 +5729,7 @@
         },
         {
           "id": "Jm3bYa1DpZb1QWF85NJ1",
-          "name": "\u00bfRecibiste tratamiento m\u00e9dico?",
+          "name": "¿Recibiste tratamiento médico?",
           "fieldKey": "contact.recibiste_tratamiento_mdico",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -5764,14 +5764,14 @@
         },
         {
           "id": "KZ3cTYyOHBrDOZGPvpmJ",
-          "name": "\u00bfAlguna vez usaste alisador qu\u00edmico para el cabello?",
+          "name": "¿Alguna vez usaste alisador químico para el cabello?",
           "fieldKey": "contact.alguna_vez_usaste_alisador_qumico_para_el_cabello",
           "dataType": "LARGE_TEXT",
           "kind": null
         },
         {
           "id": "Kml29cSeywwJ8qKUQlqX",
-          "name": "\u00bfQu\u00e9 edad ten\u00eda la persona afectada cuando recibi\u00f3 el diagn\u00f3stico?",
+          "name": "¿Qué edad tenía la persona afectada cuando recibió el diagnóstico?",
           "fieldKey": "contact.que_edad_tenia_la_persona_afectada_cuando_recibio_el_diagnostico",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -5785,7 +5785,7 @@
         },
         {
           "id": "KwEn4dkrovVUDirllnnO",
-          "name": "\u00bfFue la otra parte la culpable?",
+          "name": "¿Fue la otra parte la culpable?",
           "fieldKey": "contact.fue_la_otra_parte_la_culpable",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -5806,7 +5806,7 @@
         },
         {
           "id": "LlES28bWKsmddaoLcc64",
-          "name": "\u00bfEst\u00e1s llenando el formulario para ti, un familiar o un amigo?",
+          "name": "¿Estás llenando el formulario para ti, un familiar o un amigo?",
           "fieldKey": "contact.estas_llenando_el_formulario_para_ti_un_familiar_o_un_amigo",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -5953,7 +5953,7 @@
         },
         {
           "id": "QrhOLJNDfCDT9829NudB",
-          "name": "\u00bfTe mordieron en alg\u00fan momento en los \u00faltimos dos a\u00f1os?",
+          "name": "¿Te mordieron en algún momento en los últimos dos años?",
           "fieldKey": "contact.te_mordieron_en_algn_momento_en_los_ltimos_dos_aos",
           "dataType": "TEXT",
           "kind": null
@@ -5974,21 +5974,21 @@
         },
         {
           "id": "RDutiVFjyi9z9UeGASfF",
-          "name": "\u00bfEras contratista independiente?",
+          "name": "¿Eras contratista independiente?",
           "fieldKey": "contact.eras_contratista_independiente",
           "dataType": "TEXT",
           "kind": null
         },
         {
           "id": "RbjnRLECEU3LsgECs55q",
-          "name": "\u00bfCu\u00e1l es su nombre?",
+          "name": "¿Cuál es su nombre?",
           "fieldKey": "contact.cual_es_su_nombre",
           "dataType": "TEXT",
           "kind": null
         },
         {
           "id": "RpnSugItG1ezX6IuSCMj",
-          "name": "\u00bfQu\u00e9 preguntas tienes?",
+          "name": "¿Qué preguntas tienes?",
           "fieldKey": "contact.qu_preguntas_tienes",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -6093,7 +6093,7 @@
         },
         {
           "id": "W8rg7Tr6wsnhGiMxpyx1",
-          "name": "\u00bfEl accidente ocurri\u00f3 en los \u00faltimos 12 meses?",
+          "name": "¿El accidente ocurrió en los últimos 12 meses?",
           "fieldKey": "contact.el_accidente_ocurri_en_los_ltimos_12_meses",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -6135,7 +6135,7 @@
         },
         {
           "id": "Xyl1kwFmQLTrJCuDNTta",
-          "name": " \u00bfEn qu\u00e9 estado pas\u00f3 el accidente?",
+          "name": " ¿En qué estado pasó el accidente?",
           "fieldKey": "contact.en_qu_estado_pas_el_accidente",
           "dataType": "TEXT",
           "kind": null
@@ -6191,7 +6191,7 @@
         },
         {
           "id": "axvmpkaX4fB6qKL3eXqJ",
-          "name": "\u00bfEn qu\u00e9 estado trabajas? (9.12.24)",
+          "name": "¿En qué estado trabajas? (9.12.24)",
           "fieldKey": "contact.en_qu_estado_trabajas_91224",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -6233,14 +6233,14 @@
         },
         {
           "id": "bfCsJ45npjIuXBg1kv22",
-          "name": "\u00bfQu\u00e9 diagn\u00f3stico m\u00e9dico tuviste t\u00fa o un familiar antes de cumplir 21 a\u00f1os? Elige todas las que correspondan:",
+          "name": "¿Qué diagnóstico médico tuviste tú o un familiar antes de cumplir 21 años? Elige todas las que correspondan:",
           "fieldKey": "contact.que_diagnostico_medico_tuviste_tu_o_un_familiar_antes_de_cumplir_21_anos_elige_todas_las_que_correspondan",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
         },
         {
           "id": "boHI2nhD6NrozEMvlcqI",
-          "name": "\u00bfD\u00f3nde ocurri\u00f3?",
+          "name": "¿Dónde ocurrió?",
           "fieldKey": "contact.dnde_ocurri",
           "dataType": "TEXT",
           "kind": null
@@ -6296,14 +6296,14 @@
         },
         {
           "id": "dhnG5zenwWX8J61PHsNy",
-          "name": "\ud83e\udd16 AI CloseBot Assistant is",
+          "name": "🤖 AI CloseBot Assistant is",
           "fieldKey": "contact.ai_closebot_assistant_is",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
         },
         {
           "id": "dkd1hrsGFxBpGxjAP22g",
-          "name": " \u00bfCon qu\u00e9 tipo de caso podemos ayudarle?",
+          "name": " ¿Con qué tipo de caso podemos ayudarle?",
           "fieldKey": "contact.con_qu_tipo_de_caso_podemos_ayudarle",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -6387,7 +6387,7 @@
         },
         {
           "id": "gXBq02yZO2b8UlJOhLVz",
-          "name": "\u00bfEn qu\u00e9 estado ocurri\u00f3 la mordida?",
+          "name": "¿En qué estado ocurrió la mordida?",
           "fieldKey": "contact.en_qu_estado_ocurri_la_mordida",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -6436,7 +6436,7 @@
         },
         {
           "id": "imw2V5qtlZ6QbKNxKOe8",
-          "name": "\u00bfTienes representaci\u00f3n legal?",
+          "name": "¿Tienes representación legal?",
           "fieldKey": "contact.tienes_representacin_legal",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -6534,7 +6534,7 @@
         },
         {
           "id": "lORRW7Kbj0ga8OUFyYJM",
-          "name": "\u00bfEras empleado? ",
+          "name": "¿Eras empleado? ",
           "fieldKey": "contact.eras_empleado",
           "dataType": "TEXT",
           "kind": null
@@ -6562,7 +6562,7 @@
         },
         {
           "id": "m13djaly0pLoaz4BC8jK",
-          "name": "\u00bfAmbas partes ten\u00edan seguro de coche?",
+          "name": "¿Ambas partes tenían seguro de coche?",
           "fieldKey": "contact.ambas_partes_tenan_seguro_de_coche",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -6730,14 +6730,14 @@
         },
         {
           "id": "vIOzElXh4fwKFer7Q88i",
-          "name": "\u00bfQu\u00e9 servicios legales necesitas?",
+          "name": "¿Qué servicios legales necesitas?",
           "fieldKey": "contact.qu_servicios_legales_necesitas",
           "dataType": "LARGE_TEXT",
           "kind": null
         },
         {
           "id": "vx5GKa3P5gSpNi4hEKBp",
-          "name": "\u00bfQu\u00e9 parte te lesionaste? (partes del cuerpo)",
+          "name": "¿Qué parte te lesionaste? (partes del cuerpo)",
           "fieldKey": "contact.qu_parte_te_lesionaste_partes_del_cuerpo",
           "dataType": "TEXT",
           "kind": null
@@ -6758,7 +6758,7 @@
         },
         {
           "id": "wrIrkQbRko5QMuv7Rvg9",
-          "name": "\u00bfTe diagnosticaron alguno de estos? (puedes elegir m\u00e1s de uno)",
+          "name": "¿Te diagnosticaron alguno de estos? (puedes elegir más de uno)",
           "fieldKey": "contact.te_diagnosticaron_alguno_de_estos_puedes_elegir_ms_de_uno",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -6772,14 +6772,14 @@
         },
         {
           "id": "xpABIgtb2I4kWq74nj9s",
-          "name": "\u00bfQu\u00e9 tipo de caso tienes?",
+          "name": "¿Qué tipo de caso tienes?",
           "fieldKey": "contact.qu_tipo_de_caso_tienes",
           "dataType": "TEXT",
           "kind": null
         },
         {
           "id": "y5k4YtknWTIT3OcB6i0N",
-          "name": "\u00bfQu\u00e9 tipo de accidente?",
+          "name": "¿Qué tipo de accidente?",
           "fieldKey": "contact.qu_tipo_de_accidente_a",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -6814,7 +6814,7 @@
         },
         {
           "id": "zh1AF9usQn8QNAmqAK08",
-          "name": "\u00bfOcurri\u00f3 el accidente en los \u00faltimos 2 a\u00f1os?",
+          "name": "¿Ocurrió el accidente en los últimos 2 años?",
           "fieldKey": "contact.qu_tipo_de_accidente",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -7048,7 +7048,7 @@
             {
               "id": "bb15b9d8-bb48-4277-bb06-ef81566b29be",
               "name": "Send to Clio Grow (retainer)",
-              "class": "active",
+              "class": "signed",
               "position": 5
             },
             {
@@ -7184,7 +7184,7 @@
             {
               "id": "c6df7ddf-07b1-42f5-8867-81ae44d88284",
               "name": "Pinder Plotkin (MD)",
-              "class": "active",
+              "class": "signed",
               "position": 10
             },
             {
@@ -7316,7 +7316,7 @@
             {
               "id": "d00d715d-b537-4641-b9e5-bf79114cc44e",
               "name": "Natasha name - Pinder Plotkin Won",
-              "class": "active",
+              "class": "signed",
               "position": 32
             }
           ]
@@ -7380,7 +7380,7 @@
             {
               "id": "854e8061-7235-4176-8799-f676d0fd5898",
               "name": "Pinder plotkin (MD)",
-              "class": "active",
+              "class": "signed",
               "position": 8
             },
             {
@@ -7648,7 +7648,7 @@
             {
               "id": "9b6e0c8a-e031-4a2e-88b4-6fe20c73480b",
               "name": "Pinder Plotkin (MD) ",
-              "class": "active",
+              "class": "signed",
               "position": 8
             },
             {
@@ -7794,7 +7794,7 @@
             {
               "id": "36b04751-ac16-4df3-89cb-5ab17fdb80e0",
               "name": "Pinder Plotkin (MD) ",
-              "class": "active",
+              "class": "signed",
               "position": 3
             },
             {
@@ -8066,13 +8066,13 @@
             {
               "id": "1446e227-6a28-4c38-be5f-787a77bb101d",
               "name": "Pinder Plotkin (MD) Other Case Type",
-              "class": "active",
+              "class": "signed",
               "position": 6
             },
             {
               "id": "767bd842-ec47-4fd8-9edf-bdf3b54f6f11",
               "name": "Pinder Plotkin (MD) Personal Injury",
-              "class": "active",
+              "class": "signed",
               "position": 7
             },
             {
@@ -9114,7 +9114,7 @@
             {
               "id": "c2097cbb-3c6e-4fde-af96-2b9f6f939c3e",
               "name": "Send to Clio Grow (retainer)",
-              "class": "active",
+              "class": "signed",
               "position": 14
             },
             {
@@ -11142,7 +11142,7 @@
             {
               "id": "57e3bf5a-8ae9-435b-b59d-9f4047fc9990",
               "name": "Send to Clio Grow (retainer)",
-              "class": "active",
+              "class": "signed",
               "position": 6
             },
             {
@@ -11272,7 +11272,7 @@
             {
               "id": "1cacd11f-48f0-41dd-acd7-14ccef63b898",
               "name": "Send to Clio Grow (retainer)",
-              "class": "active",
+              "class": "signed",
               "position": 14
             }
           ]
@@ -11364,7 +11364,7 @@
             {
               "id": "a1537be3-c54d-4934-8a60-f7d77e40c8fd",
               "name": "Send to Clio Grow (retainer)",
-              "class": "active",
+              "class": "signed",
               "position": 6
             },
             {
@@ -12094,7 +12094,7 @@
         },
         {
           "id": "OIF0DFw1nhNxCiLRaPuh",
-          "name": "accidente de cami\u00f3n",
+          "name": "accidente de camión",
           "class": null
         },
         {
@@ -15749,7 +15749,7 @@
         },
         {
           "id": "gVkSiKiG5EllpSe7NsWT",
-          "name": "\u201cquick call from",
+          "name": "“quick call from",
           "class": null
         }
       ],
@@ -15833,7 +15833,7 @@
         },
         {
           "id": "21oeyCcC3ECFjU1QHO43",
-          "name": " \u00bfCon qu\u00e9 tipo de caso podemos ayudarle?",
+          "name": " ¿Con qué tipo de caso podemos ayudarle?",
           "fieldKey": "contact.con_qu_tipo_de_caso_podemos_ayudarle",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -15910,7 +15910,7 @@
         },
         {
           "id": "3yz0XWy7xNaHzxqaKsiO",
-          "name": "\u00bfOcurri\u00f3 el accidente en los \u00faltimos 2 a\u00f1os?",
+          "name": "¿Ocurrió el accidente en los últimos 2 años?",
           "fieldKey": "contact.qu_tipo_de_accidente",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -15945,7 +15945,7 @@
         },
         {
           "id": "5InVymh18Fx9Y1yE7HfT",
-          "name": "\u00bfQu\u00e9 tipo de caso tienes?",
+          "name": "¿Qué tipo de caso tienes?",
           "fieldKey": "contact.qu_tipo_de_caso_tienes",
           "dataType": "TEXT",
           "kind": null
@@ -16078,7 +16078,7 @@
         },
         {
           "id": "Bpbh02EqkRsVnQ2h4PWx",
-          "name": "\u00bfEn qu\u00e9 estado pas\u00f3 el accidente? (9.12.24)",
+          "name": "¿En qué estado pasó el accidente? (9.12.24)",
           "fieldKey": "contact.en_qu_estado_pas_el_accidente_91224",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -16246,7 +16246,7 @@
         },
         {
           "id": "HL9qosu8Pt99FkgGc8PE",
-          "name": "Fecha de la lesi\u00f3n",
+          "name": "Fecha de la lesión",
           "fieldKey": "contact.fecha_de_la_lesin",
           "dataType": "TEXT",
           "kind": null
@@ -16260,7 +16260,7 @@
         },
         {
           "id": "I5ZOo7Fpupenrs9lOELA",
-          "name": "\u00bfFue la otra parte la culpable?",
+          "name": "¿Fue la otra parte la culpable?",
           "fieldKey": "contact.fue_la_otra_parte_la_culpable",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -16407,7 +16407,7 @@
         },
         {
           "id": "NEEDq88ON65e87OKCM5J",
-          "name": "\u00bfRecibiste tratamiento m\u00e9dico?",
+          "name": "¿Recibiste tratamiento médico?",
           "fieldKey": "contact.recibiste_tratamiento_mdico",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -16512,7 +16512,7 @@
         },
         {
           "id": "QxnSA492GqE8NAcb3oxO",
-          "name": "\u00bfEl accidente ocurri\u00f3 en los \u00faltimos 12 meses?",
+          "name": "¿El accidente ocurrió en los últimos 12 meses?",
           "fieldKey": "contact.el_accidente_ocurri_en_los_ltimos_12_meses",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -16596,7 +16596,7 @@
         },
         {
           "id": "TtEqF6R3emrpvsyEJgE6",
-          "name": "\u00bfAmbas partes ten\u00edan seguro de coche?",
+          "name": "¿Ambas partes tenían seguro de coche?",
           "fieldKey": "contact.ambas_partes_tenan_seguro_de_coche",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -16652,7 +16652,7 @@
         },
         {
           "id": "V8ykX7APbNRsSgvF156y",
-          "name": "\u00bfTienes representaci\u00f3n legal?",
+          "name": "¿Tienes representación legal?",
           "fieldKey": "contact.tienes_representacin_legal",
           "dataType": "SINGLE_OPTIONS",
           "kind": null
@@ -16701,7 +16701,7 @@
         },
         {
           "id": "Wph5iAraiLumsv5lx9TP",
-          "name": "\u00bfEras contratista independiente?",
+          "name": "¿Eras contratista independiente?",
           "fieldKey": "contact.eras_contratista_independiente",
           "dataType": "TEXT",
           "kind": null
@@ -16743,7 +16743,7 @@
         },
         {
           "id": "XT58ZlwtnMdTKrv4YmbJ",
-          "name": "\u00bfCu\u00e1nto dinero te deben? (Si lo sabes)",
+          "name": "¿Cuánto dinero te deben? (Si lo sabes)",
           "fieldKey": "contact.cunto_dinero_te_deben_si_lo_sabes",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -16904,7 +16904,7 @@
         },
         {
           "id": "cpBzQldeuJRHG55b5iSv",
-          "name": "\u00bfQu\u00e9 preguntas tienes?",
+          "name": "¿Qué preguntas tienes?",
           "fieldKey": "contact.qu_preguntas_tienes",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -16939,7 +16939,7 @@
         },
         {
           "id": "dSxdMXEuJyTOD6tsjxFi",
-          "name": "\u00bfEn qu\u00e9 estado trabajas?",
+          "name": "¿En qué estado trabajas?",
           "fieldKey": "contact.en_qu_estado_trabajas",
           "dataType": "TEXT",
           "kind": null
@@ -16960,7 +16960,7 @@
         },
         {
           "id": "e0oAdnuKQlu8wkJ8p7Hm",
-          "name": "\u00bfQu\u00e9 tipo de accidente?",
+          "name": "¿Qué tipo de accidente?",
           "fieldKey": "contact.qu_tipo_de_accidente_a",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -17009,7 +17009,7 @@
         },
         {
           "id": "g3oT240EN9nhjirsywC0",
-          "name": "\u00bfEn qu\u00e9 estado trabajas? (9.12.24)",
+          "name": "¿En qué estado trabajas? (9.12.24)",
           "fieldKey": "contact.en_qu_estado_trabajas_91224",
           "dataType": "MULTIPLE_OPTIONS",
           "kind": null
@@ -17051,7 +17051,7 @@
         },
         {
           "id": "gwaKtNMda8BQsQVIyavp",
-          "name": "\u00bfQu\u00e9 servicios legales necesitas?",
+          "name": "¿Qué servicios legales necesitas?",
           "fieldKey": "contact.qu_servicios_legales_necesitas",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -17093,7 +17093,7 @@
         },
         {
           "id": "jhtR9LMqUQJbSZTjSeV9",
-          "name": "\u00bfQu\u00e9 caus\u00f3 la lesi\u00f3n? (c\u00f3mo te lesionaste)",
+          "name": "¿Qué causó la lesión? (cómo te lesionaste)",
           "fieldKey": "contact.qu_caus_la_lesin_cmo_te_lesionaste",
           "dataType": "TEXT",
           "kind": null
@@ -17373,7 +17373,7 @@
         },
         {
           "id": "sFbuJ7rkHv8jaVYNUU9L",
-          "name": "\u00bfQu\u00e9 parte te lesionaste? (partes del cuerpo)",
+          "name": "¿Qué parte te lesionaste? (partes del cuerpo)",
           "fieldKey": "contact.qu_parte_te_lesionaste_partes_del_cuerpo",
           "dataType": "TEXT",
           "kind": null
@@ -17429,14 +17429,14 @@
         },
         {
           "id": "uFhZbFu5ZYI6AOv6rR7r",
-          "name": " \u00bfEn qu\u00e9 estado pas\u00f3 el accidente?",
+          "name": " ¿En qué estado pasó el accidente?",
           "fieldKey": "contact.en_qu_estado_pas_el_accidente",
           "dataType": "TEXT",
           "kind": null
         },
         {
           "id": "uJdD9dwiCs2BcIqH2ADB",
-          "name": "Message for Mr. Plotkin\u00a0",
+          "name": "Message for Mr. Plotkin ",
           "fieldKey": "contact.message_for_mr_plotkin",
           "dataType": "LARGE_TEXT",
           "kind": null
@@ -17478,7 +17478,7 @@
         },
         {
           "id": "uYgIbPWLYu3YXJrjoV58",
-          "name": "\u00bfEras empleado? ",
+          "name": "¿Eras empleado? ",
           "fieldKey": "contact.eras_empleado",
           "dataType": "TEXT",
           "kind": null
@@ -17632,7 +17632,7 @@
         },
         {
           "id": "zkuB6yZCOZk8xm88JpFL",
-          "name": "\ud83e\udd16 AI CloseBot Assistant is",
+          "name": "🤖 AI CloseBot Assistant is",
           "fieldKey": "contact.ai_closebot_assistant_is",
           "dataType": "SINGLE_OPTIONS",
           "kind": null

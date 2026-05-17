@@ -662,7 +662,7 @@ export default function DashboardView({
       <section id="overview">
         <SectionHeader
           title="Overview"
-          subtitle={`${bucketLabel} · Last 30 days vs prior 30 days, last 7 days vs prior 7 days`}
+          subtitle={`${bucketLabel} · Last 30 days vs prior 30 days, last 7 days vs prior 7 days · DATE PICKER DOES NOT APPLY (rolling windows)`}
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
@@ -713,7 +713,7 @@ export default function DashboardView({
             icon={Briefcase}
             label="Active Signed Cases"
             value={o.activeTotal.toLocaleString()}
-            sub="Signed minus turned-down minus settled"
+            sub="Currently in a Retained stage, in-house only"
           />
         </div>
       </section>
@@ -741,7 +741,7 @@ export default function DashboardView({
       <section id="kpi">
         <SectionHeader
           title="KPIs"
-          subtitle="Spanish vs English · current + previous month, current + last quarter"
+          subtitle="Spanish vs English · current + previous month, current + last quarter · DATE PICKER DOES NOT APPLY (calendar months / quarters)"
         />
         <SectionWarning tone="warn" items={dyn} />
         <div className="space-y-6">
@@ -905,7 +905,7 @@ export default function DashboardView({
       <section id="cost">
         <SectionHeader
           title="Ad Cost"
-          subtitle="Meta ad spend joined with GHL same-window signed / referred attribution"
+          subtitle={`Meta ad spend joined with GHL signed / referred · DATE PICKER APPLIES (window: ${data.range.label})`}
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
@@ -1305,7 +1305,7 @@ export default function DashboardView({
       <section id="leads">
         <SectionHeader
           title="Lead Analytics"
-          subtitle="Sources and conversion — current range"
+          subtitle={`Sources and conversion · DATE PICKER APPLIES (window: ${data.range.label})`}
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
@@ -1426,7 +1426,7 @@ export default function DashboardView({
       <section id="intake">
         <SectionHeader
           title="Intake Team"
-          subtitle={`Per-member referrals + signed in ${data.range.label} · 30d/7d trends are rolling vs prior period · click any column to sort`}
+          subtitle={`DATE PICKER APPLIES to Referrals + Signed + Calls + SMS columns (window: ${data.range.label}). 30d/7d trend pills are rolling. Active is right-now.`}
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
@@ -1558,7 +1558,7 @@ export default function DashboardView({
       <section id="cases">
         <SectionHeader
           title="Case Analytics"
-          subtitle="Snapshot of active cases (not date-filtered)"
+          subtitle="Snapshot of currently-active cases · DATE PICKER DOES NOT APPLY (right-now view)"
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />

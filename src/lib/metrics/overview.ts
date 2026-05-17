@@ -155,23 +155,29 @@ export async function overview(
     new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000)),
   ]);
 
-  // Active Signed Cases = cases still on our books right now.
-  //   = signed up (in an in-house active_practice pipeline)
-  //     MINUS later turned down (client withdrew or referred to co-counsel)
-  //     MINUS settled (case completed / closed)
+  // Active Signed Cases = opps currently in a Retained stage
+  // (stageClass === "signed") in an in-house active_practice pipeline,
+  // status === "open". "Retained" stages are the ones where the case
+  // is signed up and PPLT is actively working it. mapping.json has
+  // already classified the relevant stage names ("Pinder Plotkin (MD)",
+  // "Signed Up (Won)", "Retainer Signed", "Send to Clio Grow (retainer)",
+  // etc.) as 'signed'.
   //
-  // Implementation: status === "open" AND pipeline is an in-house
-  // active_practice pipeline. Withdrawn / referred-out / settled cases
-  // all have status !== "open" (or live in a different pipelinePurpose),
-  // so this single predicate captures the net.
+  // Excluded by design: leads, warm-lead stages, referred-out, withdrawn,
+  // settled, closed-lost.
   const inHouseAbogadoPipelineIds = new Set(
     activePracticePipelines(getLocation("abogado")).map((p) => p.id)
   );
   const inHousePpltPipelineIds = new Set(
     activePracticePipelines(getLocation("pplt_leads")).map((p) => p.id)
   );
-  const isActiveSigned = (o: { raw: { status?: string; pipelineId?: string | null } }, ids: Set<string>) =>
-    o.raw.status === "open" && ids.has(o.raw.pipelineId ?? "");
+  const isActiveSigned = (
+    o: { raw: { status?: string; pipelineId?: string | null }; stageClass: string },
+    ids: Set<string>
+  ) =>
+    o.raw.status === "open" &&
+    o.stageClass === "signed" &&
+    ids.has(o.raw.pipelineId ?? "");
   const activeAbogado = inc.abogado
     ? opps.abogado.filter((o) => isActiveSigned(o, inHouseAbogadoPipelineIds)).length
     : 0;
