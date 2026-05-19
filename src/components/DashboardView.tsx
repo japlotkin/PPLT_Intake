@@ -6,7 +6,6 @@ import {
   Users,
   UserPlus,
   CheckCircle2,
-  Briefcase,
   Activity,
   TrendingUp,
   Sparkles,
@@ -661,7 +660,7 @@ export default function DashboardView({
     const dyn = sectionWarnings(data, ["Overview"]);
     const info: string[] = [];
     info.push(
-      `"Leads" counts Meta lead-ad form submissions that landed in GHL, deduped within 3 days. "Referred to Co-Counsel" = opps entering co-counsel / referral-broker / referred-out pipelines. "Signed" = opps entering a signed stage. "Active Signed Cases" = currently-open cases in our in-house active_practice pipelines (signed cases minus those later turned down or settled).`
+      `"Leads" counts Meta lead-ad form submissions that landed in GHL, deduped within 3 days. "Referred to Co-Counsel" = opps entering co-counsel / referral-broker / referred-out pipelines. "Signed" = opps entering a signed stage.`
     );
     if (o.reviews.lifetime === 0) {
       info.push("Google Reviews showing zero — Reputation API scope likely missing on the GHL Private Integration Token. Regenerate with Reputation > Read.");
@@ -716,12 +715,6 @@ export default function DashboardView({
             value={o.signed7.current.toLocaleString()}
             delta={o.signed7}
             sub={`Prior 7 days: ${o.signed7.previous.toLocaleString()}`}
-          />
-          <StatCard
-            icon={Briefcase}
-            label="Active Signed Cases"
-            value={o.activeTotal.toLocaleString()}
-            sub="Unique clients in a Retained stage, in-house only"
           />
         </div>
       </section>
