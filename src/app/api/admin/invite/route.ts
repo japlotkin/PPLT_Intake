@@ -43,7 +43,12 @@ export async function POST(req: Request) {
   const admin = await requireAdminEmail();
   if (!admin) return NextResponse.json({ error: "Admin only" }, { status: 403 });
 
-  let body: { email?: unknown; role?: unknown; restrictIntakeToOwnRow?: unknown };
+  let body: {
+    email?: unknown;
+    role?: unknown;
+    restrictIntakeToOwnRow?: unknown;
+    notify?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -92,23 +97,40 @@ export async function POST(req: Request) {
     await writeVisibility(cfg).catch(() => {});
   }
 
+  // notify=true (default) -> Clerk sends its own invitation email.
+  // notify=false -> Clerk skips the email; we return the accept URL so
+  //                  the admin can copy + forward it themselves
+  //                  (avoids the spam-flagged @accounts.dev email).
+  const notify = body.notify === false ? false : true;
+
   try {
     const client = await clerkClient();
     const invitation = await client.invitations.createInvitation({
       emailAddress: email,
       redirectUrl: `${baseUrl(req)}/sign-up`,
-      notify: true,
+      notify,
       ignoreExisting: true,
     });
+    // Clerk's invitation response includes a `url` field that the user
+    // clicks to accept. When notify=false, this is the URL we hand to
+    // the admin to forward.
+    const inv = invitation as unknown as {
+      id: string;
+      emailAddress?: string;
+      status?: string;
+      url?: string;
+      createdAt?: number;
+    };
     return NextResponse.json({
       ok: true,
       invitation: {
-        id: invitation.id,
-        emailAddress: invitation.emailAddress,
-        status: invitation.status,
+        id: inv.id,
+        emailAddress: inv.emailAddress,
+        status: inv.status,
+        url: inv.url,
         createdAt:
-          typeof invitation.createdAt === "number"
-            ? new Date(invitation.createdAt).toISOString()
+          typeof inv.createdAt === "number"
+            ? new Date(inv.createdAt).toISOString()
             : null,
       },
     });

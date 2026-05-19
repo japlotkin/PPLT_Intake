@@ -68,8 +68,10 @@ export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("custom");
   const [inviteRestrict, setInviteRestrict] = useState(false);
+  const [inviteNotify, setInviteNotify] = useState(false); // default = link-only (skip Clerk email)
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [invitationsError, setInvitationsError] = useState<string | null>(null);
 
@@ -116,6 +118,7 @@ export default function AdminPage() {
     if (!inviteEmail.trim()) return;
     setInviting(true);
     setInviteResult(null);
+    setInviteUrl(null);
     try {
       const res = await fetch("/api/admin/invite", {
         method: "POST",
@@ -124,16 +127,23 @@ export default function AdminPage() {
           email: inviteEmail.trim().toLowerCase(),
           role: inviteRole === "custom" ? undefined : inviteRole,
           restrictIntakeToOwnRow: inviteRestrict,
+          notify: inviteNotify,
         }),
       });
       const j = (await res.json().catch(() => ({}))) as {
         error?: string;
-        invitation?: { emailAddress?: string };
+        invitation?: { emailAddress?: string; url?: string };
       };
       if (!res.ok) throw new Error(j.error ?? `Failed: ${res.status}`);
-      setInviteResult(
-        `Invitation sent to ${j.invitation?.emailAddress ?? inviteEmail}. Clerk will email a sign-up link.`
-      );
+      const targetEmail = j.invitation?.emailAddress ?? inviteEmail;
+      if (inviteNotify) {
+        setInviteResult(
+          `Invitation sent to ${targetEmail}. Clerk emails the sign-up link.`
+        );
+      } else {
+        setInviteResult(`Link generated for ${targetEmail}. Copy + send via your own email.`);
+        setInviteUrl(j.invitation?.url ?? null);
+      }
       setInviteEmail("");
       setInviteRole("custom");
       setInviteRestrict(false);
@@ -144,6 +154,14 @@ export default function AdminPage() {
       );
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
     }
   }
 
@@ -346,13 +364,22 @@ export default function AdminPage() {
             />
             Restrict Intake Team to their own row
           </label>
+          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={inviteNotify}
+              onChange={(e) => setInviteNotify(e.target.checked)}
+              className="h-3.5 w-3.5"
+            />
+            Send via Clerk email <span className="text-slate-400">(unchecked = just give me the link)</span>
+          </label>
           <button
             onClick={sendInvite}
             disabled={inviting || !inviteEmail.trim()}
             className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-3 py-1.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
             {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Send invite
+            {inviteNotify ? "Send invite email" : "Generate link"}
           </button>
           {inviteResult && (
             <p className={`text-[11px] leading-relaxed ${
@@ -360,6 +387,21 @@ export default function AdminPage() {
             }`}>
               {inviteResult}
             </p>
+          )}
+          {inviteUrl && (
+            <div className="rounded-md border border-blue-200 bg-blue-50/60 p-2.5 space-y-1.5">
+              <div className="text-[11px] font-medium text-slate-700">Sign-up link (forward via your own email):</div>
+              <div className="text-[11px] font-mono break-all text-slate-800 bg-white border border-slate-200 rounded px-2 py-1.5">
+                {inviteUrl}
+              </div>
+              <button
+                onClick={() => copyToClipboard(inviteUrl)}
+                className="text-[11px] text-blue-700 hover:text-blue-900 font-medium"
+                type="button"
+              >
+                Copy link
+              </button>
+            </div>
           )}
         </div>
 
