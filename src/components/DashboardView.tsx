@@ -1549,7 +1549,7 @@ export default function DashboardView({
         : bucket === "spanish"
           ? data.casesSpanish ?? data.cases
           : data.cases;
-    const brokers = view.referralBrokers;
+    // const brokers = view.referralBrokers;  // unused while co-counsel charts are hidden
     const dyn = sectionWarnings(data, ["Case analytics"]);
     const info: string[] = [
       `Date picker filters charts to opps whose LEAD CAME IN during the selected window (currently: ${data.range.label}). Active in-house cases + cases at co-counsel firms come from leads that arrived in the period. By Co-Counsel (Signed) filters by when the stage flipped to signed during the window. Set the picker to "Year to Date" or "Last 90 Days" for a broader view.`,
@@ -1573,40 +1573,11 @@ export default function DashboardView({
               <BarCount data={view.byState.slice(0, 15).map((r) => ({ name: r.state, value: r.count }))} />
             </ChartCard>
           )}
-          {isSubVisible(data.visibility, "cases", "active_co_counsel") && (
-          <ChartCard
-            title="Active at Co-Counsel Firm"
-            subtitle="Top 15 · open referrals (excl. brokers)"
-            footer={
-              brokers && (brokers.lexamica > 0 || brokers.litify > 0) ? (
-                <>
-                  <span className="font-medium text-slate-700">Referral brokers (active):</span>{" "}
-                  Lexamica {brokers.lexamica.toLocaleString()} · Litify{" "}
-                  {brokers.litify.toLocaleString()}
-                </>
-              ) : null
-            }
-          >
-            <BarCount data={view.byCoCounsel.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
-          </ChartCard>
-          )}
-          {isSubVisible(data.visibility, "cases", "signed_co_counsel") && (
-          <ChartCard
-            title="Signed by Co-Counsel Firm"
-            subtitle="Top 15 · firm signed the referred case"
-            footer={
-              view.referralBrokersSigned && (view.referralBrokersSigned.lexamica > 0 || view.referralBrokersSigned.litify > 0) ? (
-                <>
-                  <span className="font-medium text-slate-700">Referral brokers (signed):</span>{" "}
-                  Lexamica {view.referralBrokersSigned.lexamica.toLocaleString()} · Litify{" "}
-                  {view.referralBrokersSigned.litify.toLocaleString()}
-                </>
-              ) : null
-            }
-          >
-            <BarCount data={view.byCoCounselSigned.slice(0, 15).map((r) => ({ name: r.firm, value: r.count }))} />
-          </ChartCard>
-          )}
+          {/* Active at Co-Counsel + Signed by Co-Counsel charts removed
+              per user request. data.cases.byCoCounsel +
+              data.cases.byCoCounselSigned still populate from
+              caseAnalytics() so re-enabling is just re-adding the
+              JSX. */}
         </div>
       </section>
     );
