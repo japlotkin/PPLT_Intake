@@ -70,7 +70,7 @@ export type Role = "manager" | "staff" | "vendor" | "custom";
 export const ROLE_LABELS: Record<Role, string> = {
   manager: "Manager — sees everything except Ad Cost",
   staff: "Staff — Overview + KPIs + own Intake row only",
-  vendor: "Vendor — Overview + Ad Cost only (external ad managers, etc.)",
+  vendor: "Vendor — Ad Cost + Lead Analytics only (external marketing managers)",
   custom: "Custom — per-section overrides",
 };
 
@@ -97,9 +97,11 @@ export const ROLE_PRESETS: Record<
     restrictIntakeToOwnRow: true,
   },
   vendor: {
-    // External vendors (Meta ad managers, Google Ads consultants, etc.):
-    // see only Overview + Ad Cost. Everything else hidden.
-    hiddenSections: ["kpi", "leads", "intake", "cases"],
+    // External marketing vendors (Meta ad managers, Google Ads
+    // consultants, etc.): see Ad Cost + Lead Analytics only. They get
+    // the data they need to optimize campaigns without firm-wide KPIs
+    // or rolling growth metrics.
+    hiddenSections: ["overview", "kpi", "intake", "cases"],
     hiddenSubsections: [],
     restrictIntakeToOwnRow: false,
   },

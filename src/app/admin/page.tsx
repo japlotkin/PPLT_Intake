@@ -335,7 +335,7 @@ export default function AdminPage() {
             <option value="custom">Custom · sees everything by default</option>
             <option value="manager">Manager · no Ad Cost</option>
             <option value="staff">Staff · Overview + KPIs + own Intake row only</option>
-            <option value="vendor">Vendor · Overview + Ad Cost only (external)</option>
+            <option value="vendor">Vendor · Ad Cost + Lead Analytics only (external marketing)</option>
           </select>
           <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
             <input
