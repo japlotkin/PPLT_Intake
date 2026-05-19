@@ -24,11 +24,17 @@ export async function GET(req: Request) {
 
   const envelope = await readSnapshot(preset);
   if (!envelope) {
+    // Don't fall back silently to this_month -- that hides the fact
+    // that the date-picker change wasn't actually applied. Give the
+    // admin a clear path.
     return NextResponse.json(
       {
         needsSync: true,
+        preset,
         message:
-          "No snapshot found yet. Click Refresh to run the first sync (takes ~60-120s).",
+          preset === "this_month"
+            ? "No snapshot found yet. Click Refresh to run the first sync (takes ~60–120s)."
+            : `Snapshot for "${preset}" hasn't been pre-synced yet. Click Refresh to run a sync (it'll compute all presets) or switch to "This Month" / "Last Month" / one of the other rolling windows.`,
       },
       { status: 503 }
     );

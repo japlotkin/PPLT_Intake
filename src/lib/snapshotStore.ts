@@ -60,27 +60,26 @@ export interface SnapshotEnvelope {
   durationMs: number;
 }
 
+/**
+ * Read the snapshot for a specific preset.
+ *
+ * Strict: returns null if the requested preset isn't in KV. Used to be a
+ * silent fallback to this_month, but that hid the fact that the
+ * date-picker dropdown wasn't actually updating data ("changed to Last
+ * Week but I'm still seeing This Month numbers"). Now /api/data
+ * surfaces a clear "not synced yet" message and the UI can prompt the
+ * admin to run /api/sync.
+ */
 export async function readSnapshot(preset: string): Promise<SnapshotEnvelope | null> {
   if (env.kv.enabled()) {
-    const v = await kv.get<SnapshotEnvelope>(keyFor(preset));
-    if (v) return v;
-    // Fallback: if the requested preset isn't pre-synced, try the default.
-    if (preset !== "this_month") {
-      return ((await kv.get<SnapshotEnvelope>(keyFor("this_month"))) ?? null);
-    }
-    return null;
+    return ((await kv.get<SnapshotEnvelope>(keyFor(preset))) ?? null);
   }
   if (IS_VERCEL) return null;
   try {
     const raw = await fs.readFile(devPath(preset), "utf-8");
     return JSON.parse(raw) as SnapshotEnvelope;
   } catch {
-    try {
-      const raw = await fs.readFile(devPath("this_month"), "utf-8");
-      return JSON.parse(raw) as SnapshotEnvelope;
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
