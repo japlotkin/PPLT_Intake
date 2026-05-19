@@ -216,7 +216,6 @@ const SECTIONS: Array<{ id: SectionVisId; label: string }> = [
   { id: "kpi", label: "KPIs" },
   { id: "cost", label: "Ad Cost" },
   { id: "leads", label: "Lead Analytics" },
-  { id: "intake", label: "Intake Team" },
   { id: "cases", label: "Case Analytics" },
 ];
 
@@ -624,7 +623,7 @@ export default function DashboardView({
             {isVisible(data.visibility, "kpi") && <Kpi data={data} bucket={bucket} />}
             {isVisible(data.visibility, "cost") && <CostBlock data={data} bucket={bucket} />}
             {isVisible(data.visibility, "leads") && <LeadsBlock data={data} bucket={bucket} />}
-            {isVisible(data.visibility, "intake") && <IntakeTeamBlock data={data} bucket={bucket} />}
+            {/* Intake Team section temporarily disabled per user request. */}
             {isVisible(data.visibility, "cases") && <CasesBlock data={data} bucket={bucket} />}
             <p className="text-[11px] text-slate-400 text-center pt-8">
               {data.syncedAt ? (
