@@ -453,6 +453,10 @@ export default function DashboardView({
       if (res.status === 503) {
         const j = (await res.json().catch(() => ({}))) as { message?: string };
         setNeedsSync(j.message ?? "No snapshot found. Click Refresh to run the first sync.");
+        // Clear stale data so the user doesn't see numbers from the
+        // previously-loaded preset alongside the "missing snapshot"
+        // message — that mismatch was causing confusion.
+        setData(null);
         return;
       }
       if (!res.ok) {

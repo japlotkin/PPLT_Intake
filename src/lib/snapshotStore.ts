@@ -28,14 +28,18 @@ function devPath(preset: string): string {
 
 /** Presets the sync pre-computes and stores. The date picker can pick any of these. */
 export const SYNCED_PRESETS = [
-  "this_month",
-  "last_month",
+  "today",
+  "yesterday",
   "this_week",
   "last_week",
-  "last_7_days",
-  "last_30_days",
+  "this_month",
+  "last_month",
   "this_quarter",
   "last_quarter",
+  "ytd",
+  "last_7_days",
+  "last_30_days",
+  "last_90_days",
 ] as const;
 
 export type SyncedPreset = (typeof SYNCED_PRESETS)[number];
