@@ -89,7 +89,10 @@ export async function PUT(req: Request) {
     : []
   ).filter((s): s is string => typeof s === "string" && VALID_SUBSECTIONS.has(s));
   const role: Role | undefined =
-    body.role === "manager" || body.role === "staff" || body.role === "custom"
+    body.role === "manager" ||
+    body.role === "staff" ||
+    body.role === "vendor" ||
+    body.role === "custom"
       ? body.role
       : undefined;
   const restrictIntakeToOwnRow = Boolean(body.restrictIntakeToOwnRow);

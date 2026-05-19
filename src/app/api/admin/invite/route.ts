@@ -55,7 +55,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
   }
   const role: Role | undefined =
-    body.role === "manager" || body.role === "staff" || body.role === "custom"
+    body.role === "manager" ||
+    body.role === "staff" ||
+    body.role === "vendor" ||
+    body.role === "custom"
       ? body.role
       : undefined;
   const restrictIntakeToOwnRow = Boolean(body.restrictIntakeToOwnRow);

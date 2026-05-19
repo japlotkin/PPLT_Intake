@@ -335,6 +335,7 @@ export default function AdminPage() {
             <option value="custom">Custom · sees everything by default</option>
             <option value="manager">Manager · no Ad Cost</option>
             <option value="staff">Staff · Overview + KPIs + own Intake row only</option>
+            <option value="vendor">Vendor · Overview + Ad Cost only (external)</option>
           </select>
           <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
             <input
@@ -521,6 +522,7 @@ export default function AdminPage() {
                     <option value="custom">{ROLE_LABELS.custom}</option>
                     <option value="manager">{ROLE_LABELS.manager}</option>
                     <option value="staff">{ROLE_LABELS.staff}</option>
+                    <option value="vendor">{ROLE_LABELS.vendor}</option>
                   </select>
                 </div>
                 <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/30">

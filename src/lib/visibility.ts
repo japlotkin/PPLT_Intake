@@ -65,11 +65,12 @@ export const SUBSECTION_LABELS: Record<string, string> = {
  * checkbox-based section visibility. Once an admin manually toggles a
  * checkbox, the role label becomes 'custom' but the toggle state wins.
  */
-export type Role = "manager" | "staff" | "custom";
+export type Role = "manager" | "staff" | "vendor" | "custom";
 
 export const ROLE_LABELS: Record<Role, string> = {
   manager: "Manager — sees everything except Ad Cost",
   staff: "Staff — Overview + KPIs + own Intake row only",
+  vendor: "Vendor — Overview + Ad Cost only (external ad managers, etc.)",
   custom: "Custom — per-section overrides",
 };
 
@@ -94,6 +95,13 @@ export const ROLE_PRESETS: Record<
     hiddenSections: ["cost", "leads", "cases"],
     hiddenSubsections: ["kpi.by_quarter"],
     restrictIntakeToOwnRow: true,
+  },
+  vendor: {
+    // External vendors (Meta ad managers, Google Ads consultants, etc.):
+    // see only Overview + Ad Cost. Everything else hidden.
+    hiddenSections: ["kpi", "leads", "intake", "cases"],
+    hiddenSubsections: [],
+    restrictIntakeToOwnRow: false,
   },
 };
 
