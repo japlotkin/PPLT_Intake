@@ -132,6 +132,29 @@ function classifyAdPracticeArea(ad: MetaAdRow): string {
   return "unknown";
 }
 
+/**
+ * Per Jason's directive: Ad Cost counts only opportunities sitting in
+ * specific pipelines, since signed cases are moved into these tracking
+ * pipelines during PPLT's case-management process.
+ *
+ *   PPLT Leads: pipeline name starts with "6", "6a", or "7"
+ *               (Mass Tort, Disability, Lexamica, all co-counsel firms)
+ *   Abogado:    pipeline name starts with "4", "5", or "6"
+ *               (Lexamica, all co-counsel firms, Dog Bites, Litify)
+ *
+ * Opps that sign in the in-house catch-all pipelines (1, 2, 3) without
+ * being moved are excluded — same as the spreadsheet that Jason maintains.
+ */
+const PPLT_PIPELINE_RE = /^(6a?|7)\b/i;
+const ABOGADO_PIPELINE_RE = /^[456]\b/;
+function isInScopePipeline(o: ClassifiedOpportunity): boolean {
+  const name = (o.pipelineName ?? "").trim();
+  if (!name) return false;
+  if (o.locationKey === "pplt_leads") return PPLT_PIPELINE_RE.test(name);
+  if (o.locationKey === "abogado") return ABOGADO_PIPELINE_RE.test(name);
+  return false;
+}
+
 /** Walk attributions[] on an opp and return its earliest+latest utmAdId values. */
 function adIdsForOpp(o: ClassifiedOpportunity): string[] {
   const attrs = o.raw.attributions ?? [];
@@ -356,6 +379,7 @@ export async function costAnalytics(
 
   for (const o of all) {
     if (!o.includeInMetrics) continue;
+    if (!isInScopePipeline(o)) continue; // Pipeline scope per Jason's directive
     const adIds = adIdsForOpp(o);
     if (adIds.length === 0) continue;
     // Last-touch attribution to avoid double-counting an opp across ads.
@@ -415,6 +439,7 @@ export async function costAnalytics(
   let totalSignedMetaSource = 0;
   for (const o of all) {
     if (!o.includeInMetrics) continue;
+    if (!isInScopePipeline(o)) continue; // Pipeline scope per Jason's directive
     if (o.stageClass !== "signed") continue;
     const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
     if (!Number.isFinite(lastChange) || lastChange < sMs || lastChange >= eMs) continue;
@@ -603,6 +628,7 @@ export async function costAnalytics(
   const byAreaStateMap = new Map<string, AreaStateAgg>();
   for (const o of all) {
     if (!o.includeInMetrics) continue;
+    if (!isInScopePipeline(o)) continue; // Pipeline scope per Jason's directive
     const adIds = adIdsForOpp(o);
     if (adIds.length === 0) continue;
     const adId = adIds[adIds.length - 1];

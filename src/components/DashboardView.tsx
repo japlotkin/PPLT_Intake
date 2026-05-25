@@ -918,6 +918,9 @@ export default function DashboardView({
     info.push(
       "Signed + CPSC each show two numbers: the BIG number is window-attribution (stage flipped IN the window, regardless of lead date — matches Ads Manager). The smaller 'coh N' below is cohort attribution (signs from leads originating IN the window — true CAC, still maturing if window ends < 60 days ago). Avg days-to-Sign / Ref are in the CSV export."
     );
+    info.push(
+      "Pipeline scope: only counts opps in PPLT Leads pipelines starting with 6, 6a, or 7 (Mass Tort, Disability, Lexamica, co-counsel) and Abogado pipelines starting with 4, 5, or 6 (Lexamica, co-counsel, Dog Bites, Litify). In-house catch-all pipelines (1, 2, 3) are excluded — matches Jason's signed-case tracking spreadsheet."
+    );
     // Attribution-rate banner: surface the gap between what the dashboard
     // can credit to a Meta ad (utmAdId on the opp) vs. total signs in the
     // window. Only shown in Combined mode — bucket views can't accurately
