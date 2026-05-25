@@ -886,6 +886,7 @@ export default function DashboardView({
         totalSignedMetaSource: undefined,
         oppPracticeAreaHits: undefined,
         oppPracticeAreaMisses: undefined,
+        paSignalCounts: undefined,
         totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
         totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
         byAd,
@@ -969,15 +970,38 @@ export default function DashboardView({
               The "Recovered" bucket comes from contacts where the source field still references Facebook / Instagram / Meta but the <code className="bg-amber-100 px-1 rounded">utmAdId</code> was dropped during the contact → opportunity transfer in GHL — those signs are Meta-driven but can't be tied to a specific ad. The "Total" column in the tables below counts all three buckets.
             </div>
             {(() => {
-              const hits = c.oppPracticeAreaHits ?? 0;
-              const misses = c.oppPracticeAreaMisses ?? 0;
-              const tot = hits + misses;
-              if (tot === 0) return null;
-              const pct = Math.round((hits / tot) * 100);
+              const counts = c.paSignalCounts ?? {};
+              const total = Object.values(counts).reduce((a, b) => a + b, 0);
+              if (total === 0) return null;
+              const order: Array<{ key: string; label: string }> = [
+                { key: "opp_custom_field", label: "Practice Area (Opp) field" },
+                { key: "opp_tags", label: "Opp tags" },
+                { key: "contact_tags", label: "Contact tags" },
+                { key: "opp_name", label: "Opp name keywords" },
+                { key: "pipeline", label: "Pipeline mapping (fallback)" },
+                { key: "unknown", label: "Unclassified" },
+              ];
               return (
                 <div className="mt-2 pt-2 border-t border-amber-200 text-amber-800 text-[11px] leading-relaxed">
-                  <span className="font-semibold">Practice Area (Opportunity) data quality:</span>{" "}
-                  {hits.toLocaleString()} of {tot.toLocaleString()} signs ({pct}%) have the opp-level field populated. The remaining {misses.toLocaleString()} fall back to the pipeline's practice area (which buckets the in-house Maryland pipeline as &quot;General PI&quot;). Populate the field at intake for cleaner attribution.
+                  <div className="font-semibold mb-1">
+                    How each sign was classified into a practice area:
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {order.map(({ key, label }) => {
+                      const n = counts[key] ?? 0;
+                      if (n === 0) return null;
+                      const pct = Math.round((n / total) * 100);
+                      return (
+                        <span key={key}>
+                          <span className="font-semibold tabular-nums">{n}</span>
+                          {" "}({pct}%) {label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-1 text-[10px] text-amber-700">
+                    Higher % on the top signals = better data quality. If most signs fall back to &quot;Pipeline mapping&quot;, populate the Practice Area (Opportunity) field at intake or add a practice-area tag on the opp.
+                  </div>
                 </div>
               );
             })()}

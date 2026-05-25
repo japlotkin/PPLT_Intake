@@ -60,6 +60,8 @@ export interface CostAnalytics {
   oppPracticeAreaHits: number;
   /** Signs whose field was blank — bucketing fell back to pipeline.practice_area. */
   oppPracticeAreaMisses: number;
+  /** Per-signal count of which detection layer hit. */
+  paSignalCounts: Record<string, number>;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];                     // sorted by spend desc
@@ -227,25 +229,72 @@ export async function costAnalytics(
   }
 
   /**
-   * Resolve an opp's practice area. Source of truth (in order):
-   *   1. opportunity.practice_area_opportunity custom field — what the
-   *      Meta lead form / intake rep selected for THIS case
-   *   2. pipeline.practice_area from mapping.json — pipeline assignment,
-   *      which buckets everything into "general_pi" for the Maryland
-   *      in-house catch-all pipeline
+   * Resolve an opp's practice area using multiple signals.
+   * Priority order (highest signal first):
+   *   1. opportunity.practice_area_opportunity custom field
+   *   2. Opp tags (e.g. "Workers Comp", "Dog Bite", "MVA")
+   *   3. Contact tags (same patterns)
+   *   4. Opp name keywords ("John Doe — WCC")
+   *   5. pipeline.practice_area from mapping.json (Maryland in-house
+   *      pipeline = general_pi catch-all)
    * Returns the canonical key (e.g. "auto", "dog_bite") or "unknown".
+   *
+   * Tracks WHICH signal hit so we can show data-quality stats and
+   * spot which signal is doing the most work.
    */
-  function oppPracticeArea(o: ClassifiedOpportunity): string {
+  type PaSignal =
+    | "opp_custom_field"
+    | "opp_tags"
+    | "contact_tags"
+    | "opp_name"
+    | "pipeline"
+    | "unknown";
+  function oppPracticeAreaWithSignal(
+    o: ClassifiedOpportunity
+  ): { pa: string; signal: PaSignal } {
+    // 1. Opp custom field
     const fieldId = oppFieldsByKey[o.locationKey].practiceArea;
-    const raw = readOppCustomField(o.raw.customFields, fieldId);
-    const normalized = normalizePracticeAreaValue(raw);
-    if (normalized) return normalized;
-    return o.practiceArea ?? "unknown";
+    const fieldRaw = readOppCustomField(o.raw.customFields, fieldId);
+    const fromField = normalizePracticeAreaValue(fieldRaw);
+    if (fromField) return { pa: fromField, signal: "opp_custom_field" };
+
+    // 2. Opp tags
+    if (o.raw.tags && o.raw.tags.length > 0) {
+      for (const tag of o.raw.tags) {
+        const t = normalizePracticeAreaValue(tag);
+        if (t) return { pa: t, signal: "opp_tags" };
+      }
+    }
+
+    // 3. Contact tags (via the customFields embed on the opp's contact —
+    //    GHL inlines the contact's tags on the opportunity payload).
+    const contactTags = (o.raw.contact as { tags?: unknown } | undefined)?.tags;
+    if (Array.isArray(contactTags)) {
+      for (const tag of contactTags) {
+        if (typeof tag !== "string") continue;
+        const t = normalizePracticeAreaValue(tag);
+        if (t) return { pa: t, signal: "contact_tags" };
+      }
+    }
+
+    // 4. Opp name (case names often include the case type)
+    const fromName = normalizePracticeAreaValue(o.raw.name);
+    if (fromName) return { pa: fromName, signal: "opp_name" };
+
+    // 5. Pipeline mapping fallback
+    if (o.practiceArea) return { pa: o.practiceArea, signal: "pipeline" };
+    return { pa: "unknown", signal: "unknown" };
+  }
+  function oppPracticeArea(o: ClassifiedOpportunity): string {
+    return oppPracticeAreaWithSignal(o).pa;
   }
   // Track how often the custom field is populated so the UI can show
   // "X% of signs are tagged at the opp level" — a data-quality signal.
   let oppPaFieldHits = 0;
   let oppPaFieldMisses = 0;
+  // Track which signal classified each sign so we can show a breakdown:
+  // "47% via opp tags, 12% via custom field, 41% pipeline fallback".
+  const signalCounts: Record<string, number> = {};
   const sMs = start.getTime();
   const eMs = end.getTime();
 
@@ -370,16 +419,13 @@ export async function costAnalytics(
     const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
     if (!Number.isFinite(lastChange) || lastChange < sMs || lastChange >= eMs) continue;
     totalSignedAll += 1;
-    // Prefer the opp-level Practice Area custom field over the pipeline's
-    // practice_area mapping. This keeps "General PI" honest: signs only
-    // land there when the rep actually marked the case as general PI, not
-    // because the in-house Maryland pipeline defaults everything to PI.
-    const fieldId = oppFieldsByKey[o.locationKey].practiceArea;
-    const fieldRaw = readOppCustomField(o.raw.customFields, fieldId);
-    const fieldNormalized = normalizePracticeAreaValue(fieldRaw);
-    if (fieldNormalized) oppPaFieldHits++;
+    // Multi-signal practice-area detection. Without this, the Maryland
+    // in-house pipeline funnels every sign into "Personal Injury (general)"
+    // and the per-PA table doesn't reconcile to the firm's actual case mix.
+    const { pa: paKey, signal } = oppPracticeAreaWithSignal(o);
+    if (signal === "opp_custom_field") oppPaFieldHits++;
     else oppPaFieldMisses++;
-    const paKey = fieldNormalized ?? o.practiceArea ?? "unknown";
+    signalCounts[signal] = (signalCounts[signal] ?? 0) + 1;
     const paLabel = paKey === "unknown" ? "Unclassified" : practiceAreaLabel(paKey);
     signedAllByPa.set(paLabel, (signedAllByPa.get(paLabel) ?? 0) + 1);
 
@@ -677,6 +723,7 @@ export async function costAnalytics(
     totalSignedMetaSource,
     oppPracticeAreaHits: oppPaFieldHits,
     oppPracticeAreaMisses: oppPaFieldMisses,
+    paSignalCounts: signalCounts,
     totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
     totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
     byAd,

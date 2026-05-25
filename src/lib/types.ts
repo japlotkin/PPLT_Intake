@@ -308,6 +308,11 @@ export interface CostAnalyticsPayload {
   oppPracticeAreaHits?: number;
   /** Signs whose Practice Area (Opportunity) custom field was blank. */
   oppPracticeAreaMisses?: number;
+  /** Breakdown of WHICH signal classified each sign:
+   *  opp_custom_field | opp_tags | contact_tags | opp_name | pipeline | unknown.
+   *  Shown in the data-quality banner so you can see whether tags are
+   *  doing the work or whether everything's stuck on pipeline fallback. */
+  paSignalCounts?: Record<string, number>;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];
