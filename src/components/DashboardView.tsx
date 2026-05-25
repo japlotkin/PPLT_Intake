@@ -878,12 +878,14 @@ export default function DashboardView({
         totalSpend,
         totalLeadsMeta,
         totalSigned,
-        // totalSignedAll + totalSignedMetaSource are firm-wide; bucket-filtered
-        // views can't accurately re-split them without locationKey tagging at
-        // compute time. Leave undefined here so the attribution banner hides
-        // in bucket mode.
+        // totalSignedAll + totalSignedMetaSource + oppPracticeArea* are
+        // firm-wide; bucket-filtered views can't accurately re-split them
+        // without locationKey tagging at compute time. Leave undefined here
+        // so the attribution banner hides in bucket mode.
         totalSignedAll: undefined,
         totalSignedMetaSource: undefined,
+        oppPracticeAreaHits: undefined,
+        oppPracticeAreaMisses: undefined,
         totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
         totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
         byAd,
@@ -966,6 +968,19 @@ export default function DashboardView({
               <span className="font-semibold">Meta-influenced total: {metaInfluenced.toLocaleString()} signs ({metaInfluencedPct}%).</span>{" "}
               The "Recovered" bucket comes from contacts where the source field still references Facebook / Instagram / Meta but the <code className="bg-amber-100 px-1 rounded">utmAdId</code> was dropped during the contact → opportunity transfer in GHL — those signs are Meta-driven but can't be tied to a specific ad. The "Total" column in the tables below counts all three buckets.
             </div>
+            {(() => {
+              const hits = c.oppPracticeAreaHits ?? 0;
+              const misses = c.oppPracticeAreaMisses ?? 0;
+              const tot = hits + misses;
+              if (tot === 0) return null;
+              const pct = Math.round((hits / tot) * 100);
+              return (
+                <div className="mt-2 pt-2 border-t border-amber-200 text-amber-800 text-[11px] leading-relaxed">
+                  <span className="font-semibold">Practice Area (Opportunity) data quality:</span>{" "}
+                  {hits.toLocaleString()} of {tot.toLocaleString()} signs ({pct}%) have the opp-level field populated. The remaining {misses.toLocaleString()} fall back to the pipeline's practice area (which buckets the in-house Maryland pipeline as &quot;General PI&quot;). Populate the field at intake for cleaner attribution.
+                </div>
+              );
+            })()}
           </div>
         )}
         {showHeadline && (

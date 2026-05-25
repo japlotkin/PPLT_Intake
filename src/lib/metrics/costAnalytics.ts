@@ -30,6 +30,12 @@ import {
   streamOpportunities,
   type ClassifiedOpportunity,
 } from "../ghl/opportunities";
+import {
+  getOppCustomFieldIds,
+  normalizePracticeAreaValue,
+  readOppCustomField,
+  type OppFieldIds,
+} from "../ghl/customFields";
 import { getLocation, practiceAreaLabel } from "../mapping";
 import type {
   AdCostRow,
@@ -50,6 +56,10 @@ export interface CostAnalytics {
   totalSignedAll: number;
   /** Signs without utmAdId but with a Meta-pattern contact source. */
   totalSignedMetaSource: number;
+  /** Signs whose Practice Area (Opportunity) custom field was populated. */
+  oppPracticeAreaHits: number;
+  /** Signs whose field was blank — bucketing fell back to pipeline.practice_area. */
+  oppPracticeAreaMisses: number;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];                     // sorted by spend desc
@@ -171,15 +181,45 @@ export async function costAnalytics(
 
   // 2. GHL signed-in-window, indexed by utmAdId
   //    Plus contact-state index for the (area, state) rollup.
+  //    Plus the opp-level "Practice Area (Opportunity)" custom-field IDs
+  //    (discovered at runtime; mapping.json doesn't catalog opp-level fields).
   const authA = authAbogado();
   const authP = authPplt();
-  const [oppsA, oppsP, contactsA, contactsP] = await Promise.all([
-    streamOpportunities(authA).then((r) => classifyOpportunities(authA, r)),
-    streamOpportunities(authP).then((r) => classifyOpportunities(authP, r)),
-    streamContacts(authA),
-    streamContacts(authP),
-  ]);
+  const [oppsA, oppsP, contactsA, contactsP, oppFieldsA, oppFieldsP] =
+    await Promise.all([
+      streamOpportunities(authA).then((r) => classifyOpportunities(authA, r)),
+      streamOpportunities(authP).then((r) => classifyOpportunities(authP, r)),
+      streamContacts(authA),
+      streamContacts(authP),
+      getOppCustomFieldIds(authA),
+      getOppCustomFieldIds(authP),
+    ]);
   const all = [...oppsA, ...oppsP];
+  const oppFieldsByKey: Record<"abogado" | "pplt_leads", OppFieldIds> = {
+    abogado: oppFieldsA,
+    pplt_leads: oppFieldsP,
+  };
+
+  /**
+   * Resolve an opp's practice area. Source of truth (in order):
+   *   1. opportunity.practice_area_opportunity custom field — what the
+   *      Meta lead form / intake rep selected for THIS case
+   *   2. pipeline.practice_area from mapping.json — pipeline assignment,
+   *      which buckets everything into "general_pi" for the Maryland
+   *      in-house catch-all pipeline
+   * Returns the canonical key (e.g. "auto", "dog_bite") or "unknown".
+   */
+  function oppPracticeArea(o: ClassifiedOpportunity): string {
+    const fieldId = oppFieldsByKey[o.locationKey].practiceArea;
+    const raw = readOppCustomField(o.raw.customFields, fieldId);
+    const normalized = normalizePracticeAreaValue(raw);
+    if (normalized) return normalized;
+    return o.practiceArea ?? "unknown";
+  }
+  // Track how often the custom field is populated so the UI can show
+  // "X% of signs are tagged at the opp level" — a data-quality signal.
+  let oppPaFieldHits = 0;
+  let oppPaFieldMisses = 0;
   const sMs = start.getTime();
   const eMs = end.getTime();
 
@@ -304,7 +344,16 @@ export async function costAnalytics(
     const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
     if (!Number.isFinite(lastChange) || lastChange < sMs || lastChange >= eMs) continue;
     totalSignedAll += 1;
-    const paKey = o.practiceArea ?? "unknown";
+    // Prefer the opp-level Practice Area custom field over the pipeline's
+    // practice_area mapping. This keeps "General PI" honest: signs only
+    // land there when the rep actually marked the case as general PI, not
+    // because the in-house Maryland pipeline defaults everything to PI.
+    const fieldId = oppFieldsByKey[o.locationKey].practiceArea;
+    const fieldRaw = readOppCustomField(o.raw.customFields, fieldId);
+    const fieldNormalized = normalizePracticeAreaValue(fieldRaw);
+    if (fieldNormalized) oppPaFieldHits++;
+    else oppPaFieldMisses++;
+    const paKey = fieldNormalized ?? o.practiceArea ?? "unknown";
     const paLabel = paKey === "unknown" ? "Unclassified" : practiceAreaLabel(paKey);
     signedAllByPa.set(paLabel, (signedAllByPa.get(paLabel) ?? 0) + 1);
 
@@ -600,6 +649,8 @@ export async function costAnalytics(
     totalSigned,
     totalSignedAll,
     totalSignedMetaSource,
+    oppPracticeAreaHits: oppPaFieldHits,
+    oppPracticeAreaMisses: oppPaFieldMisses,
     totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
     totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
     byAd,

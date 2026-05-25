@@ -302,6 +302,12 @@ export interface CostAnalyticsPayload {
    *  (Facebook / Instagram / Meta lead form). Combined with totalSigned,
    *  this is the firm's true "Meta-influenced" count. */
   totalSignedMetaSource?: number;
+  /** Signs whose Practice Area (Opportunity) custom field was populated.
+   *  Data-quality signal — high % means PA bucketing is trustworthy;
+   *  low % means most signs fell back to pipeline.practice_area. */
+  oppPracticeAreaHits?: number;
+  /** Signs whose Practice Area (Opportunity) custom field was blank. */
+  oppPracticeAreaMisses?: number;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];
