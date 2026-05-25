@@ -45,6 +45,9 @@ export interface CostAnalytics {
   totalSpend: number;
   totalLeadsMeta: number;
   totalSigned: number;
+  /** TOTAL signs in window regardless of utmAdId. Sums signedAll across
+   *  both GHL locations. Used by the UI to surface the attribution gap. */
+  totalSignedAll: number;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];                     // sorted by spend desc
@@ -261,6 +264,34 @@ export async function costAnalytics(
     aggByAdId.set(adId, slot);
   }
 
+  // 3b. ALL-SIGNS PASS (no utmAdId filter).
+  //     Walks every signed-in-window opp regardless of Meta attribution
+  //     and buckets by the opp's pipeline.practice_area + contact state.
+  //     This surfaces the gap between "signs the dashboard credits to
+  //     Meta ads" and "total signs from any source" (referrals, organic,
+  //     direct, returning clients, walk-ins, etc.).
+  const signedAllByPa = new Map<string, number>();
+  const signedAllByAreaState = new Map<string, number>();
+  let totalSignedAll = 0;
+  for (const o of all) {
+    if (!o.includeInMetrics) continue;
+    if (o.stageClass !== "signed") continue;
+    const lastChange = o.raw.lastStageChangeAt ? Date.parse(o.raw.lastStageChangeAt) : NaN;
+    if (!Number.isFinite(lastChange) || lastChange < sMs || lastChange >= eMs) continue;
+    totalSignedAll += 1;
+    const paKey = o.practiceArea ?? "unknown";
+    const paLabel = paKey === "unknown" ? "Unclassified" : practiceAreaLabel(paKey);
+    signedAllByPa.set(paLabel, (signedAllByPa.get(paLabel) ?? 0) + 1);
+
+    const stateIdx = o.locationKey === "abogado" ? contactStateA : contactStateP;
+    const state =
+      (o.raw.contactId && stateIdx.get(o.raw.contactId)) ||
+      (typeof o.raw.contact?.state === "string" ? o.raw.contact.state.trim().toUpperCase() : null) ||
+      "Unknown";
+    const asKey = `${paLabel}|||${state}`;
+    signedAllByAreaState.set(asKey, (signedAllByAreaState.get(asKey) ?? 0) + 1);
+  }
+
   // 4. Build per-ad rows (both lenses).
   const byAd: AdCostRow[] = adsRaw.map((ad) => {
     const practiceArea = classifyAdPracticeArea(ad);
@@ -333,23 +364,51 @@ export async function costAnalytics(
     paAgg.set(row.practiceArea, slot);
   }
   const byPracticeArea: PracticeAreaCostRow[] = Array.from(paAgg.entries())
-    .map(([area, v]) => ({
-      area: area === "unknown" ? "Unclassified" : practiceAreaLabel(area),
-      spend: v.spend,
-      leadsMeta: v.leads,
-      signed: v.signed,
-      referred: v.referred,
-      signedCohort: v.signedCohort,
-      referredCohort: v.referredCohort,
-      cpl: v.leads > 0 ? v.spend / v.leads : null,
-      cpsc: v.signed > 0 ? v.spend / v.signed : null,
-      cpscCohort: v.signedCohort > 0 ? v.spend / v.signedCohort : null,
-      avgDaysToSigned: v.dtsCount > 0 ? v.dts / v.dtsCount : null,
-      avgDaysToReferred: v.dtrCount > 0 ? v.dtr / v.dtrCount : null,
-      adCount: v.adCount,
+    .map(([area, v]) => {
+      const areaLabel = area === "unknown" ? "Unclassified" : practiceAreaLabel(area);
+      return {
+        area: areaLabel,
+        spend: v.spend,
+        leadsMeta: v.leads,
+        signed: v.signed,
+        referred: v.referred,
+        signedCohort: v.signedCohort,
+        referredCohort: v.referredCohort,
+        signedAll: signedAllByPa.get(areaLabel) ?? 0,
+        cpl: v.leads > 0 ? v.spend / v.leads : null,
+        cpsc: v.signed > 0 ? v.spend / v.signed : null,
+        cpscCohort: v.signedCohort > 0 ? v.spend / v.signedCohort : null,
+        avgDaysToSigned: v.dtsCount > 0 ? v.dts / v.dtsCount : null,
+        avgDaysToReferred: v.dtrCount > 0 ? v.dtr / v.dtrCount : null,
+        adCount: v.adCount,
+        cohortMaturing,
+      };
+    });
+  // Add rows for practice areas that have signs but NO ad spend (referrals,
+  // organic, walk-ins). These rows show $0 spend with the full sign count
+  // so the table sums match the firm's total signed-in-window.
+  const paLabelsInTable = new Set(byPracticeArea.map((r) => r.area));
+  for (const [label, count] of signedAllByPa.entries()) {
+    if (paLabelsInTable.has(label)) continue;
+    byPracticeArea.push({
+      area: label,
+      spend: 0,
+      leadsMeta: 0,
+      signed: 0,
+      referred: 0,
+      signedCohort: 0,
+      referredCohort: 0,
+      signedAll: count,
+      cpl: null,
+      cpsc: null,
+      cpscCohort: null,
+      avgDaysToSigned: null,
+      avgDaysToReferred: null,
+      adCount: 0,
       cohortMaturing,
-    }))
-    .sort((a, b) => b.spend - a.spend);
+    });
+  }
+  byPracticeArea.sort((a, b) => b.spend - a.spend || (b.signedAll ?? 0) - (a.signedAll ?? 0));
 
   // 5. By (Area, State) — attribute each opp's share of its source ad's
   //    spend (spend / Meta-leads). Walks opps in window with a utmAdId,
@@ -443,14 +502,39 @@ export async function costAnalytics(
       referred: r.referred,
       signedCohort: r.signedCohort,
       referredCohort: r.referredCohort,
+      signedAll: signedAllByAreaState.get(`${r.area}|||${r.state}`) ?? 0,
       cpl: r.leads > 0 ? r.spend / r.leads : null,
       cpsc: r.signed > 0 ? r.spend / r.signed : null,
       cpscCohort: r.signedCohort > 0 ? r.spend / r.signedCohort : null,
       avgDaysToSigned: r.dtsCount > 0 ? r.dts / r.dtsCount : null,
       avgDaysToReferred: r.dtrCount > 0 ? r.dtr / r.dtrCount : null,
       cohortMaturing,
-    }))
-    .sort((a, b) => b.spend - a.spend);
+    }));
+  // Add (area, state) rows for signs from any source — referrals, walk-ins,
+  // organic — so the table reflects the firm's true sign volume.
+  const asKeysInTable = new Set(byAreaState.map((r) => `${r.area}|||${r.state}`));
+  for (const [key, count] of signedAllByAreaState.entries()) {
+    if (asKeysInTable.has(key)) continue;
+    const [area, state] = key.split("|||");
+    byAreaState.push({
+      area,
+      state,
+      spend: 0,
+      leads: 0,
+      signed: 0,
+      referred: 0,
+      signedCohort: 0,
+      referredCohort: 0,
+      signedAll: count,
+      cpl: null,
+      cpsc: null,
+      cpscCohort: null,
+      avgDaysToSigned: null,
+      avgDaysToReferred: null,
+      cohortMaturing,
+    });
+  }
+  byAreaState.sort((a, b) => b.spend - a.spend || (b.signedAll ?? 0) - (a.signedAll ?? 0));
 
   // 6. Totals
   const totalSpend = byAd.reduce((s, r) => s + r.spend, 0);
@@ -464,6 +548,7 @@ export async function costAnalytics(
     totalSpend,
     totalLeadsMeta,
     totalSigned,
+    totalSignedAll,
     totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
     totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
     byAd,

@@ -857,6 +857,10 @@ export default function DashboardView({
           signedCohort: r.signedCohort,
           referredCohort: r.referredCohort,
           adCount: r.adCount,
+          // signedAll is firm-wide (we don't tag by bucket at compute time).
+          // Leave undefined in English/Spanish modes so the column shows "—"
+          // and users don't misread firm-wide totals as bucket-specific.
+          signedAll: undefined,
           cpl: r.leadsMeta > 0 ? r.spend / r.leadsMeta : null,
           cpsc: r.signed > 0 ? r.spend / r.signed : null,
           cpscCohort: r.signedCohort > 0 ? r.spend / r.signedCohort : null,
@@ -874,6 +878,11 @@ export default function DashboardView({
         totalSpend,
         totalLeadsMeta,
         totalSigned,
+        // totalSignedAll is firm-wide; bucket-filtered views can't accurately
+        // re-split it without locationKey tagging at compute time. Leave
+        // undefined here so the bucket banner falls back to the
+        // Meta-attributed totals only.
+        totalSignedAll: undefined,
         totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
         totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
         byAd,
@@ -905,6 +914,18 @@ export default function DashboardView({
     info.push(
       "Signed + CPSC each show two numbers: the BIG number is window-attribution (stage flipped IN the window, regardless of lead date — matches Ads Manager). The smaller 'coh N' below is cohort attribution (signs from leads originating IN the window — true CAC, still maturing if window ends < 60 days ago). Avg days-to-Sign / Ref are in the CSV export."
     );
+    // Attribution-rate banner: surface the gap between what the dashboard
+    // can credit to a Meta ad (utmAdId on the opp) vs. total signs in the
+    // window. Only shown in Combined mode — bucket views can't accurately
+    // re-split the firm-wide total.
+    const totalSignedAll = c.totalSignedAll ?? 0;
+    const attributedSigned = c.totalSigned ?? 0;
+    const showAttributionBanner =
+      bucket === "combined" && totalSignedAll > 0;
+    const attributionPct = totalSignedAll > 0
+      ? Math.round((attributedSigned / totalSignedAll) * 100)
+      : 0;
+    const untraceable = Math.max(0, totalSignedAll - attributedSigned);
     return (
       <section id="cost">
         <SectionHeader
@@ -913,6 +934,16 @@ export default function DashboardView({
         />
         <SectionWarning tone="warn" items={dyn} />
         <SectionWarning tone="info" items={info} />
+        {showAttributionBanner && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+            <div className="font-semibold mb-1">
+              Meta attribution: {attributedSigned.toLocaleString()} of {totalSignedAll.toLocaleString()} signs in this window ({attributionPct}%)
+            </div>
+            <div className="text-amber-800 text-[12px] leading-relaxed">
+              The {untraceable.toLocaleString()} sign{untraceable === 1 ? "" : "s"} below the Meta-attributed count came from referrals, organic, walk-ins, or Meta-source leads where the <code className="bg-amber-100 px-1 rounded">utmAdId</code> was lost during the contact → opportunity transfer in GHL. The "Total" column in the tables below shows ALL signs per practice area / state, regardless of attribution.
+            </div>
+          </div>
+        )}
         {showHeadline && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
@@ -957,7 +988,8 @@ export default function DashboardView({
                     { header: "Ads", get: (r) => r.adCount },
                     { header: "Spend ($)", get: (r) => Math.round(r.spend) },
                     { header: "Leads (Meta)", get: (r) => r.leadsMeta },
-                    { header: "Signed", get: (r) => r.signed },
+                    { header: "Signed (Meta-attributed)", get: (r) => r.signed },
+                    { header: "Total signs (any source)", get: (r) => r.signedAll ?? "" },
                     { header: "CPL ($)", get: (r) => (r.cpl === null ? "" : Math.round(r.cpl)) },
                     { header: "CPSC ($)", get: (r) => (r.cpsc === null ? "" : Math.round(r.cpsc)) },
                   ],
@@ -988,7 +1020,8 @@ export default function DashboardView({
                     { header: "State", get: (r) => r.state },
                     { header: "Spend ($)", get: (r) => Math.round(r.spend) },
                     { header: "Leads", get: (r) => r.leads },
-                    { header: "Signed", get: (r) => r.signed },
+                    { header: "Signed (Meta-attributed)", get: (r) => r.signed },
+                    { header: "Total signs (any source)", get: (r) => r.signedAll ?? "" },
                     { header: "Referred", get: (r) => r.referred },
                     { header: "CPL ($)", get: (r) => (r.cpl === null ? "" : Math.round(r.cpl)) },
                     { header: "CPSC ($)", get: (r) => (r.cpsc === null ? "" : Math.round(r.cpsc)) },
@@ -1073,12 +1106,12 @@ export default function DashboardView({
   }) {
     type Col =
       | "area" | "state" | "cpl" | "cpsc" | "cpscCohort"
-      | "spend" | "leads" | "signed" | "signedCohort" | "referred";
+      | "spend" | "leads" | "signed" | "signedCohort" | "signedAll" | "referred";
     const { sorted, sortKey, sortDir, onSort } = useSortable<AreaStateCostRow, Col>(
       rows,
       "spend",
       "desc",
-      (r, k) => r[k] as string | number | null
+      (r, k) => (r[k] ?? null) as string | number | null
     );
     const [expanded, setExpanded] = useState(false);
     const visible = expanded ? sorted : sorted.slice(0, 10);
@@ -1095,6 +1128,7 @@ export default function DashboardView({
               <SortHeader label="Leads" columnKey="leads" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="Referred" columnKey="referred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
+              <SortHeader label="Total" columnKey="signedAll" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
             </tr>
@@ -1102,7 +1136,7 @@ export default function DashboardView({
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-400 text-sm">
+                <td colSpan={9} className="px-3 py-6 text-center text-slate-400 text-sm">
                   No (area × state) buckets in this window. Most likely the contacts coming from these ads don&apos;t have State (Jurisdiction) populated.
                 </td>
               </tr>
@@ -1116,6 +1150,9 @@ export default function DashboardView({
                 <td className="px-3 py-2.5 text-right tabular-nums">
                   <div>{r.signed.toLocaleString()}</div>
                   <div className="text-[10px] text-slate-400">coh {r.signedCohort.toLocaleString()}</div>
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-800" title="Total signs in window for this (area, state) from any source.">
+                  {r.signedAll === undefined ? <span className="text-slate-300">—</span> : r.signedAll.toLocaleString()}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-blue-700">
@@ -1153,12 +1190,12 @@ export default function DashboardView({
   }) {
     type Col =
       | "area" | "adCount" | "spend" | "leadsMeta" | "signed" | "referred"
-      | "signedCohort" | "cpl" | "cpsc" | "cpscCohort";
+      | "signedCohort" | "signedAll" | "cpl" | "cpsc" | "cpscCohort";
     const { sorted, sortKey, sortDir, onSort } = useSortable<PracticeAreaCostRow, Col>(
       rows,
       "spend",
       "desc",
-      (r, k) => r[k] as string | number | null
+      (r, k) => (r[k] ?? null) as string | number | null
     );
     return (
       <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
@@ -1171,13 +1208,14 @@ export default function DashboardView({
               <SortHeader label="Leads" columnKey="leadsMeta" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="Referred" columnKey="referred" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="Signed" columnKey="signed" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
+              <SortHeader label="Total" columnKey="signedAll" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="CPL" columnKey="cpl" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
               <SortHeader label="CPSC" columnKey="cpsc" activeKey={sortKey} activeDir={sortDir} onSort={onSort} align="right" className="px-3" />
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 ? (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-6 text-center text-slate-400 text-sm">No ad spend in this window.</td></tr>
             ) : sorted.map((r) => (
               <tr key={r.area} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                 <td className="px-3 py-2.5 font-medium text-slate-800">{r.area}</td>
@@ -1190,6 +1228,9 @@ export default function DashboardView({
                   <div className="text-[10px] text-slate-400" title="Cohort: leads from this window that have signed by now">
                     coh {r.signedCohort.toLocaleString()}
                   </div>
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-800" title="Total signs in window from any source (Meta ads, referrals, organic, walk-ins). Includes signs the dashboard couldn't attribute to a specific Meta ad.">
+                  {r.signedAll === undefined ? <span className="text-slate-300">—</span> : r.signedAll.toLocaleString()}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{fmtUsd2(r.cpl)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-blue-700">

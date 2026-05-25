@@ -246,6 +246,11 @@ export interface PracticeAreaCostRow {
   referred: number;
   signedCohort: number;
   referredCohort: number;
+  /** TOTAL signs in window for this practice area, regardless of whether
+   *  the opp had a utmAdId. Includes referrals, walk-ins, organic, plus
+   *  Meta-attributed signs. Use this to spot attribution gaps.
+   *  Optional for backward compat with older snapshots/mock fixtures. */
+  signedAll?: number;
   cpl: number | null;
   cpsc: number | null;
   cpscCohort: number | null;
@@ -264,6 +269,10 @@ export interface AreaStateCostRow {
   referred: number;
   signedCohort: number;
   referredCohort: number;
+  /** TOTAL signs in window for this (area, state), regardless of utmAdId.
+   *  Lets the dashboard show all signs in a row, not just the Meta-attributed ones.
+   *  Optional for backward compat with older snapshots/mock fixtures. */
+  signedAll?: number;
   cpl: number | null;
   cpsc: number | null;
   cpscCohort: number | null;
@@ -277,6 +286,10 @@ export interface CostAnalyticsPayload {
   totalSpend: number;
   totalLeadsMeta: number;
   totalSigned: number;
+  /** TOTAL signs in window across both locations regardless of utmAdId.
+   *  Used to show the attribution gap on the dashboard. Optional for
+   *  backward compat with older snapshots/mock fixtures. */
+  totalSignedAll?: number;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];
