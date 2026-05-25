@@ -199,6 +199,32 @@ export async function costAnalytics(
     abogado: oppFieldsA,
     pplt_leads: oppFieldsP,
   };
+  // Surface discovery failures as warnings — PIT tokens are supposed to
+  // have read access to /customFields, so silent fallback would hide a
+  // real config problem.
+  if (oppFieldsA.discoveryError) {
+    warnings.push(
+      `Abogado opp custom-field discovery failed: ${oppFieldsA.discoveryError}. Practice Area bucketing will fall back to pipeline.practice_area for Abogado signs.`
+    );
+  }
+  if (oppFieldsP.discoveryError) {
+    warnings.push(
+      `PPLT Leads opp custom-field discovery failed: ${oppFieldsP.discoveryError}. Practice Area bucketing will fall back to pipeline.practice_area for PPLT signs.`
+    );
+  }
+  // Also warn if discovery worked but the Practice Area field is not
+  // configured in a location (e.g. the user added it in PPLT but not
+  // Abogado yet).
+  if (!oppFieldsA.discoveryError && oppFieldsA.practiceArea === null && (oppFieldsA.fieldCount ?? 0) > 0) {
+    warnings.push(
+      "Abogado is missing the 'Practice Area (Opportunity)' custom field. Add it in GHL → Custom Fields → Opportunity tab so signs bucket correctly."
+    );
+  }
+  if (!oppFieldsP.discoveryError && oppFieldsP.practiceArea === null && (oppFieldsP.fieldCount ?? 0) > 0) {
+    warnings.push(
+      "PPLT Leads is missing the 'Practice Area (Opportunity)' custom field. Add it in GHL → Custom Fields → Opportunity tab so signs bucket correctly."
+    );
+  }
 
   /**
    * Resolve an opp's practice area. Source of truth (in order):

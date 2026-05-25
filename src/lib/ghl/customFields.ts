@@ -30,12 +30,21 @@ const cache = new Map<string, { expires: number; ids: OppFieldIds }>();
 export interface OppFieldIds {
   practiceArea: string | null;
   state: string | null;
+  /** Set when discovery itself failed (token rejected, network, etc.).
+   *  When set, the field IDs are nulls and the caller should warn.
+   *  When unset and IDs are nulls, the field just doesn't exist yet. */
+  discoveryError?: string;
+  /** Number of opportunity-level custom fields returned by GHL. Useful
+   *  for distinguishing "field not configured" (count > 0, IDs null)
+   *  from "discovery failed" (discoveryError set). */
+  fieldCount?: number;
 }
 
 /**
  * Look up the opportunity-level "Practice Area" + "State" field IDs for
  * a location. Returns nulls when the field doesn't exist (so older
- * locations without the field still work).
+ * locations without the field still work). Sets discoveryError when the
+ * lookup itself fails so the dashboard can surface a warning.
  */
 export async function getOppCustomFieldIds(auth: GhlAuth): Promise<OppFieldIds> {
   const cacheKey = auth.locationId;
@@ -58,13 +67,23 @@ export async function getOppCustomFieldIds(auth: GhlAuth): Promise<OppFieldIds> 
       fields.find((f) => f.fieldKey === "opportunity.state_opportunity")?.id ??
       fields.find((f) => /^state\b/i.test(f.name ?? ""))?.id ??
       null;
-    const ids = { practiceArea, state };
+    const ids: OppFieldIds = {
+      practiceArea,
+      state,
+      fieldCount: fields.length,
+    };
     cache.set(cacheKey, { expires: now + TTL_MS, ids });
     return ids;
-  } catch {
-    // Failure (e.g. token can't read customFields) -> remember empty for a
-    // short window so we don't hammer the endpoint, then retry next sync.
-    const ids = { practiceArea: null, state: null };
+  } catch (e) {
+    // PIT tokens should have full read access. If discovery fails,
+    // surface the error so the dashboard banner can warn — don't silently
+    // pretend the field doesn't exist. Short TTL so we retry next sync.
+    const msg = e instanceof Error ? e.message : String(e);
+    const ids: OppFieldIds = {
+      practiceArea: null,
+      state: null,
+      discoveryError: msg.slice(0, 200),
+    };
     cache.set(cacheKey, { expires: now + 5 * 60 * 1000, ids });
     return ids;
   }
