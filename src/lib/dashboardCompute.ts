@@ -202,6 +202,7 @@ export async function computeDashboardData(opts: ComputeOptions = {}): Promise<D
         totalLeadsMeta: 0,
         totalSigned: 0,
         totalSignedAll: 0,
+        totalSignedMetaSource: 0,
         totalCpl: null,
         totalCpsc: null,
         byAd: [],

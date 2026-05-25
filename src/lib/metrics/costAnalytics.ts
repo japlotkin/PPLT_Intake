@@ -24,7 +24,7 @@ import {
   windowKeyFor,
 } from "../metaAdsCache";
 import { authAbogado, authPplt } from "../ghl/client";
-import { streamContacts } from "../ghl/contacts";
+import { streamContacts, isMetaLeadFormSource } from "../ghl/contacts";
 import {
   classifyOpportunities,
   streamOpportunities,
@@ -48,6 +48,8 @@ export interface CostAnalytics {
   /** TOTAL signs in window regardless of utmAdId. Sums signedAll across
    *  both GHL locations. Used by the UI to surface the attribution gap. */
   totalSignedAll: number;
+  /** Signs without utmAdId but with a Meta-pattern contact source. */
+  totalSignedMetaSource: number;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];                     // sorted by spend desc
@@ -184,6 +186,23 @@ export async function costAnalytics(
   const contactStateA = buildContactStateIndex(contactsA, stateFieldIdsFor("abogado"));
   const contactStateP = buildContactStateIndex(contactsP, stateFieldIdsFor("pplt_leads"));
 
+  // Contact -> source. Used to recover signs whose opp lost its utmAdId
+  // during the contact -> opportunity transfer in GHL. If the contact's
+  // source string still references Facebook / Instagram / Meta, we credit
+  // the sign as "Meta-source" even without a specific ad ID.
+  const contactSourceA = new Map<string, string>();
+  for (const c of contactsA) {
+    if (typeof c.source === "string" && c.source.trim()) {
+      contactSourceA.set(c.id, c.source);
+    }
+  }
+  const contactSourceP = new Map<string, string>();
+  for (const c of contactsP) {
+    if (typeof c.source === "string" && c.source.trim()) {
+      contactSourceP.set(c.id, c.source);
+    }
+  }
+
   // 3. DUAL ATTRIBUTION: compute BOTH lenses on the same pass.
   //    Same-window: stage flipped to signed/referred IN [start, end).
   //                 Matches Ads Manager. Reconciles to a monthly report.
@@ -272,7 +291,13 @@ export async function costAnalytics(
   //     direct, returning clients, walk-ins, etc.).
   const signedAllByPa = new Map<string, number>();
   const signedAllByAreaState = new Map<string, number>();
+  // Meta-source recovery: signs WITHOUT utmAdId whose contact.source
+  // matches Facebook/Instagram/Meta lead-form patterns. Disjoint from
+  // the utmAdId-attributed `signed` counter.
+  const signedMetaSourceByPa = new Map<string, number>();
+  const signedMetaSourceByAreaState = new Map<string, number>();
   let totalSignedAll = 0;
+  let totalSignedMetaSource = 0;
   for (const o of all) {
     if (!o.includeInMetrics) continue;
     if (o.stageClass !== "signed") continue;
@@ -290,6 +315,27 @@ export async function costAnalytics(
       "Unknown";
     const asKey = `${paLabel}|||${state}`;
     signedAllByAreaState.set(asKey, (signedAllByAreaState.get(asKey) ?? 0) + 1);
+
+    // Meta-source fallback: only counts when there's NO utmAdId (would be
+    // double-counted with the per-ad `signed` total otherwise) AND the
+    // contact source pattern-matches Meta.
+    const adIdsForThis = adIdsForOpp(o);
+    if (adIdsForThis.length === 0) {
+      const srcIdx = o.locationKey === "abogado" ? contactSourceA : contactSourceP;
+      // ClassifiedOpportunity.raw.contact is narrowly typed (state only).
+      // GHL returns source on the same object — cast to read it.
+      const oppContact = o.raw.contact as { source?: unknown } | undefined;
+      const inlineSrc = typeof oppContact?.source === "string" ? oppContact.source : null;
+      const src =
+        (o.raw.contactId && srcIdx.get(o.raw.contactId)) ||
+        inlineSrc ||
+        null;
+      if (isMetaLeadFormSource(src)) {
+        totalSignedMetaSource += 1;
+        signedMetaSourceByPa.set(paLabel, (signedMetaSourceByPa.get(paLabel) ?? 0) + 1);
+        signedMetaSourceByAreaState.set(asKey, (signedMetaSourceByAreaState.get(asKey) ?? 0) + 1);
+      }
+    }
   }
 
   // 4. Build per-ad rows (both lenses).
@@ -375,6 +421,7 @@ export async function costAnalytics(
         signedCohort: v.signedCohort,
         referredCohort: v.referredCohort,
         signedAll: signedAllByPa.get(areaLabel) ?? 0,
+        signedMetaSource: signedMetaSourceByPa.get(areaLabel) ?? 0,
         cpl: v.leads > 0 ? v.spend / v.leads : null,
         cpsc: v.signed > 0 ? v.spend / v.signed : null,
         cpscCohort: v.signedCohort > 0 ? v.spend / v.signedCohort : null,
@@ -399,6 +446,7 @@ export async function costAnalytics(
       signedCohort: 0,
       referredCohort: 0,
       signedAll: count,
+      signedMetaSource: signedMetaSourceByPa.get(label) ?? 0,
       cpl: null,
       cpsc: null,
       cpscCohort: null,
@@ -503,6 +551,7 @@ export async function costAnalytics(
       signedCohort: r.signedCohort,
       referredCohort: r.referredCohort,
       signedAll: signedAllByAreaState.get(`${r.area}|||${r.state}`) ?? 0,
+      signedMetaSource: signedMetaSourceByAreaState.get(`${r.area}|||${r.state}`) ?? 0,
       cpl: r.leads > 0 ? r.spend / r.leads : null,
       cpsc: r.signed > 0 ? r.spend / r.signed : null,
       cpscCohort: r.signedCohort > 0 ? r.spend / r.signedCohort : null,
@@ -526,6 +575,7 @@ export async function costAnalytics(
       signedCohort: 0,
       referredCohort: 0,
       signedAll: count,
+      signedMetaSource: signedMetaSourceByAreaState.get(key) ?? 0,
       cpl: null,
       cpsc: null,
       cpscCohort: null,
@@ -549,6 +599,7 @@ export async function costAnalytics(
     totalLeadsMeta,
     totalSigned,
     totalSignedAll,
+    totalSignedMetaSource,
     totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
     totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
     byAd,

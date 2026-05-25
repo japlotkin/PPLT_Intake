@@ -878,11 +878,12 @@ export default function DashboardView({
         totalSpend,
         totalLeadsMeta,
         totalSigned,
-        // totalSignedAll is firm-wide; bucket-filtered views can't accurately
-        // re-split it without locationKey tagging at compute time. Leave
-        // undefined here so the bucket banner falls back to the
-        // Meta-attributed totals only.
+        // totalSignedAll + totalSignedMetaSource are firm-wide; bucket-filtered
+        // views can't accurately re-split them without locationKey tagging at
+        // compute time. Leave undefined here so the attribution banner hides
+        // in bucket mode.
         totalSignedAll: undefined,
+        totalSignedMetaSource: undefined,
         totalCpl: totalLeadsMeta > 0 ? totalSpend / totalLeadsMeta : null,
         totalCpsc: totalSigned > 0 ? totalSpend / totalSigned : null,
         byAd,
@@ -920,12 +921,17 @@ export default function DashboardView({
     // re-split the firm-wide total.
     const totalSignedAll = c.totalSignedAll ?? 0;
     const attributedSigned = c.totalSigned ?? 0;
+    const metaSourceRecovered = c.totalSignedMetaSource ?? 0;
+    const metaInfluenced = attributedSigned + metaSourceRecovered;
     const showAttributionBanner =
       bucket === "combined" && totalSignedAll > 0;
     const attributionPct = totalSignedAll > 0
       ? Math.round((attributedSigned / totalSignedAll) * 100)
       : 0;
-    const untraceable = Math.max(0, totalSignedAll - attributedSigned);
+    const metaInfluencedPct = totalSignedAll > 0
+      ? Math.round((metaInfluenced / totalSignedAll) * 100)
+      : 0;
+    const other = Math.max(0, totalSignedAll - metaInfluenced);
     return (
       <section id="cost">
         <SectionHeader
@@ -936,11 +942,29 @@ export default function DashboardView({
         <SectionWarning tone="info" items={info} />
         {showAttributionBanner && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
-            <div className="font-semibold mb-1">
-              Meta attribution: {attributedSigned.toLocaleString()} of {totalSignedAll.toLocaleString()} signs in this window ({attributionPct}%)
+            <div className="font-semibold mb-2">
+              Sign attribution · {totalSignedAll.toLocaleString()} total signs in this window
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+              <div className="rounded-lg bg-white/60 border border-amber-100 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold">Ad-attributed</div>
+                <div className="text-lg font-bold tabular-nums">{attributedSigned.toLocaleString()}</div>
+                <div className="text-[10px] text-amber-700">{attributionPct}% · opp has utmAdId</div>
+              </div>
+              <div className="rounded-lg bg-white/60 border border-amber-100 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold">Meta-source (recovered)</div>
+                <div className="text-lg font-bold tabular-nums">{metaSourceRecovered.toLocaleString()}</div>
+                <div className="text-[10px] text-amber-700">contact source = FB / IG / Meta, no ad ID</div>
+              </div>
+              <div className="rounded-lg bg-white/60 border border-amber-100 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold">Other</div>
+                <div className="text-lg font-bold tabular-nums">{other.toLocaleString()}</div>
+                <div className="text-[10px] text-amber-700">referrals, organic, walk-ins, blank source</div>
+              </div>
             </div>
             <div className="text-amber-800 text-[12px] leading-relaxed">
-              The {untraceable.toLocaleString()} sign{untraceable === 1 ? "" : "s"} below the Meta-attributed count came from referrals, organic, walk-ins, or Meta-source leads where the <code className="bg-amber-100 px-1 rounded">utmAdId</code> was lost during the contact → opportunity transfer in GHL. The "Total" column in the tables below shows ALL signs per practice area / state, regardless of attribution.
+              <span className="font-semibold">Meta-influenced total: {metaInfluenced.toLocaleString()} signs ({metaInfluencedPct}%).</span>{" "}
+              The "Recovered" bucket comes from contacts where the source field still references Facebook / Instagram / Meta but the <code className="bg-amber-100 px-1 rounded">utmAdId</code> was dropped during the contact → opportunity transfer in GHL — those signs are Meta-driven but can't be tied to a specific ad. The "Total" column in the tables below counts all three buckets.
             </div>
           </div>
         )}

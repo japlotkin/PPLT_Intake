@@ -251,6 +251,11 @@ export interface PracticeAreaCostRow {
    *  Meta-attributed signs. Use this to spot attribution gaps.
    *  Optional for backward compat with older snapshots/mock fixtures. */
   signedAll?: number;
+  /** Signs that had NO utmAdId but whose contact.source matches a Meta /
+   *  Facebook / Instagram lead-ad pattern. Recovers signs lost during the
+   *  contact -> opportunity transfer in GHL. Disjoint from `signed`
+   *  (which requires utmAdId). */
+  signedMetaSource?: number;
   cpl: number | null;
   cpsc: number | null;
   cpscCohort: number | null;
@@ -273,6 +278,9 @@ export interface AreaStateCostRow {
    *  Lets the dashboard show all signs in a row, not just the Meta-attributed ones.
    *  Optional for backward compat with older snapshots/mock fixtures. */
   signedAll?: number;
+  /** Signs that had NO utmAdId but whose contact.source matches a Meta
+   *  pattern. Disjoint from `signed`. */
+  signedMetaSource?: number;
   cpl: number | null;
   cpsc: number | null;
   cpscCohort: number | null;
@@ -290,6 +298,10 @@ export interface CostAnalyticsPayload {
    *  Used to show the attribution gap on the dashboard. Optional for
    *  backward compat with older snapshots/mock fixtures. */
   totalSignedAll?: number;
+  /** Signs where utmAdId was missing but contact.source indicates Meta
+   *  (Facebook / Instagram / Meta lead form). Combined with totalSigned,
+   *  this is the firm's true "Meta-influenced" count. */
+  totalSignedMetaSource?: number;
   totalCpl: number | null;
   totalCpsc: number | null;
   byAd: AdCostRow[];
